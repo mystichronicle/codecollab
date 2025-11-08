@@ -1,0 +1,297 @@
+version: '3.8'
+
+services:
+  # PostgreSQL - Primary Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: codecollab-postgres
+    environment:
+      POSTGRES_USER: codecollab
+      POSTGRES_PASSWORD: dev_password_change_in_prod
+      POSTGRES_DB: codecollab
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infrastructure/init-db:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U codecollab"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - codecollab-network
+
+  # Redis - Caching and Pub/Sub
+  redis:
+    image: redis:7-alpine
+    container_name: codecollab-redis
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - codecollab-network
+
+  # MongoDB - Document Storage
+  mongodb:
+    image: mongo:7
+    container_name: codecollab-mongodb
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: codecollab
+      MONGO_INITDB_ROOT_PASSWORD: dev_password_change_in_prod
+      MONGO_INITDB_DATABASE: codecollab
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - codecollab-network
+
+  # RabbitMQ - Message Queue
+  rabbitmq:
+    image: rabbitmq:3.12-management-alpine
+    container_name: codecollab-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: codecollab
+      RABBITMQ_DEFAULT_PASS: dev_password_change_in_prod
+    ports:
+      - "5672:5672"   # AMQP
+      - "15672:15672" # Management UI
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - codecollab-network
+
+  # API Gateway - Python FastAPI
+  api-gateway:
+    build:
+      context: ./services/api-gateway
+      dockerfile: Dockerfile
+    container_name: codecollab-api-gateway
+    environment:
+      - DATABASE_URL=postgresql://codecollab:dev_password_change_in_prod@postgres:5432/codecollab
+      - REDIS_URL=redis://redis:6379/0
+      - MONGODB_URL=mongodb://codecollab:dev_password_change_in_prod@mongodb:27017/codecollab?authSource=admin
+      - RABBITMQ_URL=amqp://codecollab:dev_password_change_in_prod@rabbitmq:5672/
+      - SECRET_KEY=dev_secret_key_change_in_prod
+      - ENVIRONMENT=development
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./services/api-gateway:/app
+      - /app/.venv  # Prevent overwriting venv
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    networks:
+      - codecollab-network
+
+  # Auth Service - Python FastAPI
+  auth-service:
+    build:
+      context: ./services/auth-service
+      dockerfile: Dockerfile
+    container_name: codecollab-auth-service
+    environment:
+      - DATABASE_URL=postgresql://codecollab:dev_password_change_in_prod@postgres:5432/codecollab
+      - REDIS_URL=redis://redis:6379/1
+      - SECRET_KEY=dev_secret_key_change_in_prod
+      - JWT_ALGORITHM=HS256
+      - ACCESS_TOKEN_EXPIRE_MINUTES=30
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./services/auth-service:/app
+      - /app/.venv
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload
+    networks:
+      - codecollab-network
+
+  # Collaboration Service - Go
+  collab-service:
+    build:
+      context: ./services/collab-service
+      dockerfile: Dockerfile
+    container_name: codecollab-collab-service
+    environment:
+      - REDIS_URL=redis://redis:6379/2
+      - MONGODB_URL=mongodb://codecollab:dev_password_change_in_prod@mongodb:27017/codecollab?authSource=admin
+      - PORT=8002
+    ports:
+      - "8002:8002"
+    volumes:
+      - ./services/collab-service:/app
+    depends_on:
+      redis:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+    networks:
+      - codecollab-network
+
+  # AI Service - Python
+  ai-service:
+    build:
+      context: ./services/ai-service
+      dockerfile: Dockerfile
+    container_name: codecollab-ai-service
+    environment:
+      - REDIS_URL=redis://redis:6379/3
+      - MONGODB_URL=mongodb://codecollab:dev_password_change_in_prod@mongodb:27017/codecollab?authSource=admin
+      - MODEL_CACHE_DIR=/models
+      - HUGGINGFACE_HUB_CACHE=/models/huggingface
+    ports:
+      - "8003:8003"
+    volumes:
+      - ./services/ai-service:/app
+      - ai_models:/models  # Persist downloaded models
+      - /app/.venv
+    depends_on:
+      redis:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8003 --reload
+    networks:
+      - codecollab-network
+
+  # Execution Service - Rust (Sandboxed code execution)
+  execution-service:
+    build:
+      context: ./services/execution-service
+      dockerfile: Dockerfile
+    container_name: codecollab-execution-service
+    environment:
+      - REDIS_URL=redis://redis:6379/4
+      - PORT=8004
+    ports:
+      - "8004:8004"
+    volumes:
+      - ./services/execution-service:/app
+      - /var/run/docker.sock:/var/run/docker.sock
+    privileged: true
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - codecollab-network
+
+  # Compiler Service - V Lang (Fast compilation, performance analysis)
+  compiler-service:
+    build:
+      context: ./services/compiler-service
+      dockerfile: Dockerfile
+    container_name: codecollab-compiler-service
+    environment:
+      - REDIS_URL=redis://redis:6379/5
+      - PORT=8005
+    ports:
+      - "8005:8005"
+    volumes:
+      - ./services/compiler-service:/app
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - codecollab-network
+
+  # Memory Service - Zig (Low-level memory profiling, performance monitoring)
+  memory-service:
+    build:
+      context: ./services/memory-service
+      dockerfile: Dockerfile
+    container_name: codecollab-memory-service
+    environment:
+      - REDIS_URL=redis://redis:6379/6
+      - PORT=8006
+    ports:
+      - "8006:8006"
+    volumes:
+      - ./services/memory-service:/app
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - codecollab-network
+
+  # Session Manager - Elixir (Distributed sessions, fault-tolerant state)
+  session-manager:
+    build:
+      context: ./services/session-manager
+      dockerfile: Dockerfile
+    container_name: codecollab-session-manager
+    environment:
+      - REDIS_URL=redis://redis:6379/7
+      - MONGODB_URL=mongodb://codecollab:dev_password_change_in_prod@mongodb:27017/codecollab?authSource=admin
+      - PORT=8007
+      - NODE_NAME=session_manager@127.0.0.1
+    ports:
+      - "8007:8007"
+      - "4369:4369"  # EPMD
+    volumes:
+      - ./services/session-manager:/app
+    depends_on:
+      redis:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+    networks:
+      - codecollab-network
+
+  # Frontend - React + TypeScript
+  frontend:
+    build:
+      context: ./services/frontend
+      dockerfile: Dockerfile
+    container_name: codecollab-frontend
+    environment:
+      - VITE_API_GATEWAY_URL=http://localhost:8000
+      - VITE_WS_URL=ws://localhost:8002
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./services/frontend:/app
+      - /app/node_modules  # Prevent overwriting node_modules
+    command: npm run dev -- --host 0.0.0.0
+    networks:
+      - codecollab-network
+
+networks:
+  codecollab-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  mongodb_data:
+  rabbitmq_data:
+  ai_models:
