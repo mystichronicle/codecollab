@@ -9,11 +9,6 @@ interface KeyboardShortcut {
   altKey?: boolean;
 }
 
-interface KeyboardShortcutsProps {
-  shortcuts: KeyboardShortcut[];
-  enabled?: boolean;
-}
-
 export const useKeyboardShortcuts = (shortcuts: KeyboardShortcut[], enabled = true) => {
   useEffect(() => {
     if (!enabled) return;
