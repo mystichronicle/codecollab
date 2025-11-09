@@ -260,3 +260,51 @@ async def join_session_by_code(
     # Remove MongoDB _id
     session.pop('_id', None)
     return session
+
+
+@router.get("/sessions/{session_id}/export")
+async def export_session(
+    session_id: str,
+    current_user = Depends(get_current_user)
+):
+    """Export session code as downloadable file"""
+    from fastapi.responses import Response
+    
+    session = await get_session_or_404(session_id)
+    
+    # Check if user has access
+    if current_user.username not in session["participants"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You don't have access to this session"
+        )
+    
+    # Determine file extension based on language
+    extensions = {
+        "python": "py",
+        "javascript": "js",
+        "typescript": "ts",
+        "go": "go",
+        "rust": "rs",
+        "cpp": "cpp",
+        "c": "c",
+        "java": "java",
+        "vlang": "v",
+        "zig": "zig",
+        "elixir": "ex"
+    }
+    
+    ext = extensions.get(session["language"], "txt")
+    filename = f"{session['name'].replace(' ', '_')}.{ext}"
+    code = session.get("code", "")
+    
+    logger.info(f"User {current_user.username} exporting session {session_id}")
+    
+    return Response(
+        content=code,
+        media_type="text/plain",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"'
+        }
+    )
+

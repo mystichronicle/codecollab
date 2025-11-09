@@ -130,6 +130,13 @@ export const sessionsAPI = {
     const response = await api.post(`/sessions/join-by-code/${shareCode}`);
     return response.data;
   },
+  
+  export: async (sessionId: string): Promise<Blob> => {
+    const response = await api.get(`/sessions/${sessionId}/export`, {
+      responseType: 'blob',
+    });
+    return response.data;
+  },
 };
 
 // Favorites API

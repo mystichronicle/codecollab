@@ -303,6 +303,49 @@ export const SessionEditor: React.FC = () => {
     }
   };
 
+  const handleExport = async () => {
+    if (!session || !sessionId) return;
+    
+    try {
+      const blob = await sessionsAPI.export(sessionId);
+      
+      // Determine file extension
+      const extensions: Record<string, string> = {
+        python: 'py',
+        javascript: 'js',
+        typescript: 'ts',
+        go: 'go',
+        rust: 'rs',
+        cpp: 'cpp',
+        c: 'c',
+        java: 'java',
+        vlang: 'v',
+        zig: 'zig',
+        elixir: 'ex'
+      };
+      
+      const ext = extensions[session.language] || 'txt';
+      const filename = `${session.name.replace(/\s+/g, '_')}.${ext}`;
+      
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+      setOutput(`Code exported successfully as ${filename}`);
+      setShowOutput(true);
+    } catch (error) {
+      console.error('Failed to export session:', error);
+      setOutput('Failed to export code. Please try again.');
+      setShowOutput(true);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
@@ -419,6 +462,18 @@ export const SessionEditor: React.FC = () => {
                 <span className="text-sm">Saving...</span>
               </div>
             )}
+
+            {/* Export Button */}
+            <button
+              onClick={handleExport}
+              className="px-4 py-2 rounded-lg font-semibold transition-all flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-600/30"
+              title="Download code"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+              <span>Export</span>
+            </button>
 
             {/* Run Button */}
             <button
