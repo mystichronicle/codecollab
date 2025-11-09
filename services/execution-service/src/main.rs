@@ -2,6 +2,7 @@ use actix_web::{web, App, HttpResponse, HttpServer, Responder};
 use actix_cors::Cors;
 use serde::{Deserialize, Serialize};
 use std::env;
+use std::io::{self, Write};
 
 #[derive(Debug, Serialize, Deserialize)]
 struct ExecuteRequest {
@@ -676,11 +677,18 @@ async fn execute_vlang(code: &str, timeout: u64) -> Result<(String, String, i32)
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
+    println!("=== Execution Service Starting ===");
+    io::stdout().flush().unwrap();
+    println!("Initializing logger...");
+    io::stdout().flush().unwrap();
+    
     env_logger::init_from_env(env_logger::Env::default().default_filter_or("info"));
     
     let port = env::var("PORT").unwrap_or_else(|_| "8004".to_string());
     let bind_address = format!("0.0.0.0:{}", port);
     
+    println!("Binding to: {}", bind_address);
+    io::stdout().flush().unwrap();
     log::info!("Starting Execution Service on {}", bind_address);
     
     HttpServer::new(|| {
