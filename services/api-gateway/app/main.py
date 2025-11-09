@@ -6,7 +6,7 @@ import time
 
 from app.core.config import settings
 from app.core.mongodb import connect_to_mongo, close_mongo_connection
-from app.core.init_db import create_indexes
+from app.core.init_db import init_mongodb_indexes
 from app.api.v1 import health, users, sessions, auth
 
 logging.basicConfig(
@@ -64,14 +64,14 @@ app.include_router(sessions.router, prefix="/api/v1", tags=["sessions"])
 
 
 @app.on_event("startup")
-async def on_startup():
-    """Initialize application resources on startup."""
-    logger.info(f"Starting {settings.PROJECT_NAME} API Gateway")
-    logger.info(f"Environment: {settings.ENVIRONMENT}")
-    # Connect to MongoDB
+async def startup_event():
+    """Run tasks on application startup."""
+    logger.info("Connecting to MongoDB...")
     await connect_to_mongo()
-    # Create indexes
-    await create_indexes()
+    logger.info("Creating database indexes...")
+    await init_mongodb_indexes()
+    logger.info("Application startup complete!")
+
 
 
 @app.on_event("shutdown")
