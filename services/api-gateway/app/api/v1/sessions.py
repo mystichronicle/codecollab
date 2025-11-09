@@ -126,7 +126,10 @@ async def get_session(
         }
     )
     
-    logger.info(f"User {current_user.username} accessing session {session_id}")
+    # Sanitize user input for logging to prevent log injection
+    safe_username = current_user.username.replace('\n', '').replace('\r', '')
+    safe_session_id = session_id.replace('\n', '').replace('\r', '')
+    logger.info(f"User {safe_username} accessing session {safe_session_id}")
     
     # Return updated session with access tracking
     updated_session = await get_session_or_404(session_id)
@@ -302,7 +305,10 @@ async def export_session(
     filename = f"{session['name'].replace(' ', '_')}.{ext}"
     code = session.get("code", "")
     
-    logger.info(f"User {current_user.username} exporting session {session_id}")
+    # Sanitize user input for logging to prevent log injection
+    safe_username = current_user.username.replace('\n', '').replace('\r', '')
+    safe_session_id = session_id.replace('\n', '').replace('\r', '')
+    logger.info(f"User {safe_username} exporting session {safe_session_id}")
     
     return Response(
         content=code,

@@ -115,7 +115,10 @@ async def add_favorite(
                 {"$addToSet": {"favorite_sessions": session_id}}
             )
     
-    logger.info(f"User {current_user.username} added session {session_id} to favorites")
+    # Sanitize user input for logging to prevent log injection
+    safe_username = current_user.username.replace('\n', '').replace('\r', '')
+    safe_session_id = session_id.replace('\n', '').replace('\r', '')
+    logger.info(f"User {safe_username} added session {safe_session_id} to favorites")
     return {"message": "Session added to favorites", "session_id": session_id}
 
 
@@ -132,7 +135,10 @@ async def remove_favorite(
         {"$pull": {"favorite_sessions": session_id}}
     )
     
-    logger.info(f"User {current_user.username} removed session {session_id} from favorites")
+    # Sanitize user input for logging to prevent log injection
+    safe_username = current_user.username.replace('\n', '').replace('\r', '')
+    safe_session_id = session_id.replace('\n', '').replace('\r', '')
+    logger.info(f"User {safe_username} removed session {safe_session_id} from favorites")
     return {"message": "Session removed from favorites", "session_id": session_id}
 
 
