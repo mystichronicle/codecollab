@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { sessionsAPI, authAPI, Session } from '../services/api';
+import { sessionsAPI, authAPI, Session, favoritesAPI } from '../services/api';
 import { DashboardSkeleton } from './LoadingSkeleton';
 import { ErrorAlert, SuccessAlert } from './ErrorAlert';
 import { SessionStats } from './SessionStats';
 import { useKeyboardShortcuts, KeyboardShortcutsHelp } from './KeyboardShortcuts';
 import { EmptyState, NoResultsState } from './EmptyState';
+import { FavoriteButton } from './FavoriteButton';
 
 interface User {
   id: number;
@@ -46,6 +47,8 @@ export const Dashboard: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterLanguage, setFilterLanguage] = useState('all');
   const [showShortcutsHelp, setShowShortcutsHelp] = useState(false);
+  const [favorites, setFavorites] = useState<string[]>([]);
+  const [showOnlyFavorites, setShowOnlyFavorites] = useState(false);
   const navigate = useNavigate();
 
   // Keyboard shortcuts
@@ -84,8 +87,18 @@ export const Dashboard: React.FC = () => {
   useEffect(() => {
     if (user) {
       loadSessions();
+      loadFavorites();
     }
   }, [user, filterLanguage]);
+
+  const loadFavorites = async () => {
+    try {
+      const favoriteIds = await favoritesAPI.getFavorites();
+      setFavorites(favoriteIds);
+    } catch (err) {
+      console.error('Failed to load favorites:', err);
+    }
+  };
 
   const loadUserData = async () => {
     try {
@@ -167,12 +180,21 @@ export const Dashboard: React.FC = () => {
     }
   };
 
-  // Filter sessions based on search and language
+  // Filter sessions based on search, language, and favorites
   const filteredSessions = sessions.filter((session) => {
     const matchesSearch = session.name.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesLanguage = filterLanguage === 'all' || session.language === filterLanguage;
-    return matchesSearch && matchesLanguage;
+    const matchesFavorites = !showOnlyFavorites || favorites.includes(session.id);
+    return matchesSearch && matchesLanguage && matchesFavorites;
   });
+
+  const handleFavoriteToggle = (sessionId: string, newState: boolean) => {
+    if (newState) {
+      setFavorites([...favorites, sessionId]);
+    } else {
+      setFavorites(favorites.filter(id => id !== sessionId));
+    }
+  };
 
   if (loading) {
     return (
@@ -361,6 +383,20 @@ export const Dashboard: React.FC = () => {
               </div>
             </div>
             <button
+              onClick={() => setShowOnlyFavorites(!showOnlyFavorites)}
+              className={`px-4 py-3.5 backdrop-blur border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all flex items-center gap-2 ${
+                showOnlyFavorites
+                  ? 'bg-yellow-500/20 border-yellow-500/50 text-yellow-400'
+                  : 'bg-gray-800/50 border-gray-700/50 text-gray-400 hover:text-white hover:border-gray-600/50'
+              }`}
+              title="Show only favorites"
+            >
+              <svg className="w-5 h-5" fill={showOnlyFavorites ? 'currentColor' : 'none'} viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+              </svg>
+              {showOnlyFavorites && <span className="text-sm font-medium">{favorites.length}</span>}
+            </button>
+            <button
               onClick={() => setShowShortcutsHelp(true)}
               className="px-4 py-3.5 bg-gray-800/50 backdrop-blur border border-gray-700/50 rounded-xl text-gray-400 hover:text-white hover:border-gray-600/50 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
               title="Keyboard shortcuts (/)"
@@ -379,9 +415,17 @@ export const Dashboard: React.FC = () => {
             return (
               <div
                 key={session.id}
-                onClick={() => handleJoinSession(session.id)}
-                className="group relative bg-gradient-to-br from-gray-800/50 to-gray-900/50 backdrop-blur rounded-2xl p-6 border border-gray-700/50 hover:border-gray-600/50 cursor-pointer transition-all duration-300 hover:shadow-2xl hover:shadow-purple-500/10 hover:-translate-y-1"
+                className="group relative bg-gradient-to-br from-gray-800/50 to-gray-900/50 backdrop-blur rounded-2xl p-6 border border-gray-700/50 hover:border-gray-600/50 transition-all duration-300 hover:shadow-2xl hover:shadow-purple-500/10 hover:-translate-y-1"
               >
+                {/* Favorite Button */}
+                <div className="absolute top-3 left-3 z-10">
+                  <FavoriteButton
+                    sessionId={session.id}
+                    isFavorite={favorites.includes(session.id)}
+                    onToggle={handleFavoriteToggle}
+                  />
+                </div>
+
                 {/* Language Badge */}
                 <div className="absolute -top-3 -right-3">
                   <div className={`px-4 py-2 bg-gradient-to-r ${langColor.badge} rounded-xl shadow-lg transform group-hover:scale-110 transition-transform duration-200`}>
@@ -392,11 +436,19 @@ export const Dashboard: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Session Content */}
-                <div className="mt-4">
-                  <h3 className="text-xl font-bold text-white mb-3 group-hover:text-blue-400 transition-colors line-clamp-2">
-                    {session.name}
-                  </h3>
+                {/* Session Content - clickable */}
+                <div className="mt-4 cursor-pointer" onClick={() => handleJoinSession(session.id)}>
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-xl font-bold text-white group-hover:text-blue-400 transition-colors line-clamp-2 flex-1">
+                      {session.name}
+                    </h3>
+                    {/* Recently Active Badge */}
+                    {session.last_accessed_at && new Date(session.last_accessed_at).getTime() > Date.now() - 3600000 && (
+                      <span className="ml-2 px-2 py-1 text-xs font-semibold bg-green-500/20 text-green-400 rounded-lg border border-green-500/30">
+                        Active
+                      </span>
+                    )}
+                  </div>
                   
                   <div className="flex items-center justify-between text-sm">
                     <div className="flex items-center space-x-4">

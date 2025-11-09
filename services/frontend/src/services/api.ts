@@ -77,6 +77,9 @@ export interface Session {
   participants: string[];
   share_code: string;
   created_at: string;
+  updated_at?: string;
+  last_accessed_at?: string;
+  access_count?: number;
   is_active: boolean;
   code?: string;
 }
@@ -126,6 +129,22 @@ export const sessionsAPI = {
   joinByCode: async (shareCode: string): Promise<Session> => {
     const response = await api.post(`/sessions/join-by-code/${shareCode}`);
     return response.data;
+  },
+};
+
+// Favorites API
+export const favoritesAPI = {
+  getFavorites: async (): Promise<string[]> => {
+    const response = await api.get('/users/favorites');
+    return response.data;
+  },
+  
+  addFavorite: async (sessionId: string): Promise<void> => {
+    await api.post(`/users/favorites/${sessionId}`);
+  },
+  
+  removeFavorite: async (sessionId: string): Promise<void> => {
+    await api.delete(`/users/favorites/${sessionId}`);
   },
 };
 

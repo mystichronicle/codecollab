@@ -29,6 +29,9 @@ class SessionResponse(BaseModel):
     participants: List[str]
     share_code: str
     created_at: str
+    updated_at: Optional[str] = None
+    last_accessed_at: Optional[str] = None
+    access_count: Optional[int] = 0
     is_active: bool
     code: Optional[str] = None
 

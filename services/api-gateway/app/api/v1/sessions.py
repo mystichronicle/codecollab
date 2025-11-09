@@ -56,7 +56,9 @@ async def create_session(
         "is_active": True,
         "share_code": share_code,
         "created_at": now,
-        "updated_at": now
+        "updated_at": now,
+        "last_accessed_at": now,
+        "access_count": 0
     }
     
     await db.sessions.insert_one(new_session)
@@ -103,6 +105,7 @@ async def get_session(
     current_user = Depends(get_current_user)
 ):
     """Get session by ID"""
+    db = get_database()
     session = await get_session_or_404(session_id)
     
     # Check if user has access
@@ -112,8 +115,20 @@ async def get_session(
             detail="You don't have access to this session"
         )
     
-    logger.info(f"User {current_user.username} fetching session {session_id}")
-    return session
+    # Track session access (activity tracking)
+    await db.sessions.update_one(
+        {"id": session_id},
+        {
+            "$set": {"last_accessed_at": datetime.utcnow().isoformat()},
+            "$inc": {"access_count": 1}
+        }
+    )
+    
+    logger.info(f"User {current_user.username} accessing session {session_id}")
+    
+    # Return updated session with access tracking
+    updated_session = await get_session_or_404(session_id)
+    return updated_session
 
 
 @router.put("/sessions/{session_id}", response_model=SessionResponse)
