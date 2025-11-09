@@ -1,6 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { sessionsAPI, authAPI, Session } from '../services/api';
+import { sessionsAPI, authAPI, Session, favoritesAPI } from '../services/api';
+import { DashboardSkeleton } from './LoadingSkeleton';
+import { ErrorAlert, SuccessAlert } from './ErrorAlert';
+import { SessionStats } from './SessionStats';
+import { useKeyboardShortcuts, KeyboardShortcutsHelp } from './KeyboardShortcuts';
+import { EmptyState, NoResultsState } from './EmptyState';
+import { FavoriteButton } from './FavoriteButton';
 
 interface User {
   id: number;
@@ -30,16 +36,51 @@ export const Dashboard: React.FC = () => {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [newSessionName, setNewSessionName] = useState('');
   const [newSessionLanguage, setNewSessionLanguage] = useState('python');
   const [newSessionDescription, setNewSessionDescription] = useState('');
+  const [newSessionTags, setNewSessionTags] = useState<string[]>([]);
+  const [tagInput, setTagInput] = useState('');
   const [joinCode, setJoinCode] = useState('');
   const [joinError, setJoinError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [filterLanguage, setFilterLanguage] = useState('all');
+  const [showShortcutsHelp, setShowShortcutsHelp] = useState(false);
+  const [favorites, setFavorites] = useState<string[]>([]);
+  const [showOnlyFavorites, setShowOnlyFavorites] = useState(false);
   const navigate = useNavigate();
+
+  // Keyboard shortcuts
+  const shortcuts = [
+    {
+      key: 'n',
+      description: 'Create new session',
+      action: () => setShowCreateModal(true),
+      ctrlKey: true,
+    },
+    {
+      key: 'j',
+      description: 'Join session by code',
+      action: () => setShowJoinModal(true),
+      ctrlKey: true,
+    },
+    {
+      key: 'k',
+      description: 'Focus search',
+      action: () => document.getElementById('session-search')?.focus(),
+      ctrlKey: true,
+    },
+    {
+      key: '/',
+      description: 'Show keyboard shortcuts',
+      action: () => setShowShortcutsHelp(true),
+    },
+  ];
+
+  useKeyboardShortcuts(shortcuts);
 
   useEffect(() => {
     loadUserData();
@@ -48,8 +89,18 @@ export const Dashboard: React.FC = () => {
   useEffect(() => {
     if (user) {
       loadSessions();
+      loadFavorites();
     }
   }, [user, filterLanguage]);
+
+  const loadFavorites = async () => {
+    try {
+      const favoriteIds = await favoritesAPI.getFavorites();
+      setFavorites(favoriteIds);
+    } catch (err) {
+      console.error('Failed to load favorites:', err);
+    }
+  };
 
   const loadUserData = async () => {
     try {
@@ -92,6 +143,7 @@ export const Dashboard: React.FC = () => {
         name: newSessionName.trim(),
         language: newSessionLanguage,
         description: newSessionDescription.trim() || undefined,
+        tags: newSessionTags,
       });
       
       setSessions([newSession, ...sessions]);
@@ -99,10 +151,33 @@ export const Dashboard: React.FC = () => {
       setNewSessionName('');
       setNewSessionDescription('');
       setNewSessionLanguage('python');
+      setNewSessionTags([]);
+      setTagInput('');
+      setSuccessMessage(`Session "${newSession.name}" created successfully!`);
+      setTimeout(() => setSuccessMessage(''), 3000);
       navigate(`/session/${newSession.id}`);
     } catch (err: any) {
       console.error('Failed to create session:', err);
-      alert('Failed to create session: ' + (err.response?.data?.detail || err.message));
+      setError('Failed to create session: ' + (err.response?.data?.detail || err.message));
+      setTimeout(() => setError(''), 5000);
+    }
+  };
+
+  const handleAddTag = () => {
+    if (tagInput.trim() && !newSessionTags.includes(tagInput.trim())) {
+      setNewSessionTags([...newSessionTags, tagInput.trim()]);
+      setTagInput('');
+    }
+  };
+
+  const handleRemoveTag = (tagToRemove: string) => {
+    setNewSessionTags(newSessionTags.filter(tag => tag !== tagToRemove));
+  };
+
+  const handleTagInputKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleAddTag();
     }
   };
 
@@ -128,26 +203,75 @@ export const Dashboard: React.FC = () => {
     }
   };
 
-  // Filter sessions based on search and language
+  // Filter sessions based on search, language, and favorites
   const filteredSessions = sessions.filter((session) => {
     const matchesSearch = session.name.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesLanguage = filterLanguage === 'all' || session.language === filterLanguage;
-    return matchesSearch && matchesLanguage;
+    const matchesFavorites = !showOnlyFavorites || favorites.includes(session.id);
+    return matchesSearch && matchesLanguage && matchesFavorites;
   });
+
+  const handleFavoriteToggle = (sessionId: string, newState: boolean) => {
+    if (newState) {
+      setFavorites([...favorites, sessionId]);
+    } else {
+      setFavorites(favorites.filter(id => id !== sessionId));
+    }
+  };
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500 mx-auto"></div>
-          <p className="mt-4 text-gray-400 text-lg">Loading your workspace...</p>
-        </div>
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
+        {/* Header Skeleton */}
+        <header className="bg-gray-900/50 backdrop-blur-xl border-b border-gray-800/50 sticky top-0 z-40">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex justify-between items-center h-20">
+              <div className="flex items-center space-x-4">
+                <div className="w-12 h-12 bg-gray-700/50 rounded-xl animate-pulse"></div>
+                <div>
+                  <div className="h-6 w-32 bg-gray-700/50 rounded animate-pulse mb-1"></div>
+                  <div className="h-3 w-24 bg-gray-700/50 rounded animate-pulse"></div>
+                </div>
+              </div>
+              <div className="flex items-center space-x-4">
+                <div className="h-10 w-32 bg-gray-700/50 rounded-xl animate-pulse"></div>
+                <div className="h-10 w-20 bg-gray-700/50 rounded-xl animate-pulse"></div>
+              </div>
+            </div>
+          </div>
+        </header>
+        
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          {/* Action Buttons Skeleton */}
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <div className="h-8 w-48 bg-gray-700/50 rounded animate-pulse mb-2"></div>
+              <div className="h-4 w-64 bg-gray-700/50 rounded animate-pulse"></div>
+            </div>
+            <div className="flex gap-3">
+              <div className="h-12 w-36 bg-gray-700/50 rounded-xl animate-pulse"></div>
+              <div className="h-12 w-36 bg-gray-700/50 rounded-xl animate-pulse"></div>
+            </div>
+          </div>
+          
+          {/* Search Bar Skeleton */}
+          <div className="flex gap-4 mb-8">
+            <div className="flex-1 h-14 bg-gray-700/50 rounded-xl animate-pulse"></div>
+            <div className="w-48 h-14 bg-gray-700/50 rounded-xl animate-pulse"></div>
+          </div>
+          
+          <DashboardSkeleton />
+        </main>
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
+      {/* Error and Success Notifications */}
+      {error && <ErrorAlert message={error} onClose={() => setError('')} />}
+      {successMessage && <SuccessAlert message={successMessage} onClose={() => setSuccessMessage('')} />}
+      
       {/* Modern Header */}
       <header className="bg-gray-900/50 backdrop-blur-xl border-b border-gray-800/50 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -201,16 +325,8 @@ export const Dashboard: React.FC = () => {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {error && (
-          <div className="mb-6 rounded-xl bg-red-500/10 border border-red-500/50 p-4 backdrop-blur">
-            <div className="flex items-center">
-              <svg className="w-5 h-5 text-red-400 mr-3" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd"/>
-              </svg>
-              <p className="text-sm text-red-200 font-medium">{error}</p>
-            </div>
-          </div>
-        )}
+        {/* Session Statistics */}
+        {sessions.length > 0 && <SessionStats sessions={sessions} />}
 
         {/* Header Actions */}
         <div className="flex items-center justify-between mb-8">
@@ -255,37 +371,63 @@ export const Dashboard: React.FC = () => {
               </svg>
             </div>
             <input
+              id="session-search"
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search sessions by name..."
+              placeholder="Search sessions by name... (Ctrl+K)"
               className="w-full pl-12 pr-4 py-3.5 bg-gray-800/50 backdrop-blur border border-gray-700/50 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
             />
           </div>
-          <div className="relative">
-            <select
-              value={filterLanguage}
-              onChange={(e) => setFilterLanguage(e.target.value)}
-              className="pl-4 pr-10 py-3.5 bg-gray-800/50 backdrop-blur border border-gray-700/50 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all appearance-none cursor-pointer min-w-[200px] font-medium"
-            >
-              <option value="all">All Languages</option>
-              <option value="python">🐍 Python</option>
-              <option value="javascript">📜 JavaScript</option>
-              <option value="typescript">🔷 TypeScript</option>
-              <option value="go">🐹 Go</option>
-              <option value="rust">🦀 Rust</option>
-              <option value="cpp">⚙️ C++</option>
-              <option value="c">🔧 C</option>
-              <option value="java">☕ Java</option>
-              <option value="vlang">⚡ V Lang</option>
-              <option value="zig">⚡ Zig</option>
-              <option value="elixir">💧 Elixir</option>
-            </select>
-            <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-              <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7"/>
-              </svg>
+          <div className="flex gap-3">
+            <div className="relative">
+              <select
+                value={filterLanguage}
+                onChange={(e) => setFilterLanguage(e.target.value)}
+                className="pl-4 pr-10 py-3.5 bg-gray-800/50 backdrop-blur border border-gray-700/50 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all appearance-none cursor-pointer min-w-[200px] font-medium"
+              >
+                <option value="all">All Languages</option>
+                <option value="python">🐍 Python</option>
+                <option value="javascript">📜 JavaScript</option>
+                <option value="typescript">🔷 TypeScript</option>
+                <option value="go">🐹 Go</option>
+                <option value="rust">🦀 Rust</option>
+                <option value="cpp">⚙️ C++</option>
+                <option value="c">🔧 C</option>
+                <option value="java">☕ Java</option>
+                <option value="vlang">⚡ V Lang</option>
+                <option value="zig">⚡ Zig</option>
+                <option value="elixir">💧 Elixir</option>
+              </select>
+              <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7"/>
+                </svg>
+              </div>
             </div>
+            <button
+              onClick={() => setShowOnlyFavorites(!showOnlyFavorites)}
+              className={`px-4 py-3.5 backdrop-blur border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all flex items-center gap-2 ${
+                showOnlyFavorites
+                  ? 'bg-yellow-500/20 border-yellow-500/50 text-yellow-400'
+                  : 'bg-gray-800/50 border-gray-700/50 text-gray-400 hover:text-white hover:border-gray-600/50'
+              }`}
+              title="Show only favorites"
+            >
+              <svg className="w-5 h-5" fill={showOnlyFavorites ? 'currentColor' : 'none'} viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+              </svg>
+              {showOnlyFavorites && <span className="text-sm font-medium">{favorites.length}</span>}
+            </button>
+            <button
+              onClick={() => setShowShortcutsHelp(true)}
+              className="px-4 py-3.5 bg-gray-800/50 backdrop-blur border border-gray-700/50 rounded-xl text-gray-400 hover:text-white hover:border-gray-600/50 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+              title="Keyboard shortcuts (/)"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/>
+              </svg>
+            </button>
           </div>
         </div>
 
@@ -296,9 +438,17 @@ export const Dashboard: React.FC = () => {
             return (
               <div
                 key={session.id}
-                onClick={() => handleJoinSession(session.id)}
-                className="group relative bg-gradient-to-br from-gray-800/50 to-gray-900/50 backdrop-blur rounded-2xl p-6 border border-gray-700/50 hover:border-gray-600/50 cursor-pointer transition-all duration-300 hover:shadow-2xl hover:shadow-purple-500/10 hover:-translate-y-1"
+                className="group relative bg-gradient-to-br from-gray-800/50 to-gray-900/50 backdrop-blur rounded-2xl p-6 border border-gray-700/50 hover:border-gray-600/50 transition-all duration-300 hover:shadow-2xl hover:shadow-purple-500/10 hover:-translate-y-1"
               >
+                {/* Favorite Button */}
+                <div className="absolute top-3 left-3 z-10">
+                  <FavoriteButton
+                    sessionId={session.id}
+                    isFavorite={favorites.includes(session.id)}
+                    onToggle={handleFavoriteToggle}
+                  />
+                </div>
+
                 {/* Language Badge */}
                 <div className="absolute -top-3 -right-3">
                   <div className={`px-4 py-2 bg-gradient-to-r ${langColor.badge} rounded-xl shadow-lg transform group-hover:scale-110 transition-transform duration-200`}>
@@ -309,13 +459,40 @@ export const Dashboard: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Session Content */}
-                <div className="mt-4">
-                  <h3 className="text-xl font-bold text-white mb-3 group-hover:text-blue-400 transition-colors line-clamp-2">
-                    {session.name}
-                  </h3>
+                {/* Session Content - clickable */}
+                <div className="mt-4 cursor-pointer" onClick={() => handleJoinSession(session.id)}>
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-xl font-bold text-white group-hover:text-blue-400 transition-colors line-clamp-2 flex-1">
+                      {session.name}
+                    </h3>
+                    {/* Recently Active Badge */}
+                    {session.last_accessed_at && new Date(session.last_accessed_at).getTime() > Date.now() - 3600000 && (
+                      <span className="ml-2 px-2 py-1 text-xs font-semibold bg-green-500/20 text-green-400 rounded-lg border border-green-500/30">
+                        Active
+                      </span>
+                    )}
+                  </div>
                   
-                  <div className="flex items-center justify-between text-sm">
+                  {/* Tags */}
+                  {session.tags && session.tags.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mt-2">
+                      {session.tags.slice(0, 3).map((tag, index) => (
+                        <span
+                          key={index}
+                          className="px-2 py-0.5 text-xs font-medium bg-blue-600/20 text-blue-300 rounded border border-blue-500/30"
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                      {session.tags.length > 3 && (
+                        <span className="px-2 py-0.5 text-xs font-medium bg-gray-700/50 text-gray-400 rounded border border-gray-600/50">
+                          +{session.tags.length - 3}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  
+                  <div className="flex items-center justify-between text-sm mt-2">
                     <div className="flex items-center space-x-4">
                       {/* Participants */}
                       <div className="flex items-center text-gray-400 group-hover:text-gray-300 transition-colors">
@@ -368,55 +545,31 @@ export const Dashboard: React.FC = () => {
 
         {/* No Results State */}
         {filteredSessions.length === 0 && sessions.length > 0 && (
-          <div className="text-center py-12">
-            <div className="w-14 h-14 mx-auto mb-3 bg-gray-800/50 rounded-lg flex items-center justify-center">
-              <svg className="w-7 h-7 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-              </svg>
-            </div>
-            <h3 className="text-base font-semibold text-white mb-1">No sessions found</h3>
-            <p className="text-gray-400 mb-3 text-sm">Try adjusting your search or filter</p>
-            <button
-              onClick={() => {
-                setSearchQuery('');
-                setFilterLanguage('all');
-              }}
-              className="px-4 py-2 text-sm font-medium text-white bg-gray-800 rounded-lg hover:bg-gray-700 transition-colors"
-            >
-              Clear Filters
-            </button>
-          </div>
+          <NoResultsState
+            searchQuery={searchQuery}
+            filterLanguage={filterLanguage}
+            onClear={() => {
+              setSearchQuery('');
+              setFilterLanguage('all');
+            }}
+          />
         )}
 
         {/* Empty State */}
         {sessions.length === 0 && (
-          <div className="text-center py-12">
-            <div className="relative inline-block mb-4">
-              <div className="w-16 h-16 bg-gradient-to-br from-blue-500/20 to-purple-500/20 rounded-xl flex items-center justify-center backdrop-blur">
-                <svg className="w-8 h-8 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/>
-                </svg>
-              </div>
-              <div className="absolute -top-1 -right-1 w-5 h-5 bg-purple-500 rounded-full flex items-center justify-center shadow-lg">
-                <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/>
-                </svg>
-              </div>
-            </div>
-            <h3 className="text-lg font-bold text-white mb-2">No sessions yet</h3>
-            <p className="text-gray-400 mb-4 text-sm">
-              Create your first coding session to start collaborating
-            </p>
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="px-5 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 rounded-lg hover:from-blue-700 hover:via-purple-700 hover:to-pink-700 focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all duration-200 shadow-lg hover:scale-105 transform inline-flex items-center"
-            >
-              <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/>
+          <EmptyState
+            icon={
+              <svg className="w-10 h-10 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/>
               </svg>
-              Create Your First Session
-            </button>
-          </div>
+            }
+            title="No sessions yet"
+            description="Create your first coding session to start collaborating with others in real-time"
+            action={{
+              label: 'Create Your First Session',
+              onClick: () => setShowCreateModal(true),
+            }}
+          />
         )}
       </main>
 
@@ -482,6 +635,54 @@ export const Dashboard: React.FC = () => {
                   rows={3}
                   className="w-full px-5 py-4 bg-gray-900/50 backdrop-blur border border-gray-700/50 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all text-base resize-none"
                 />
+              </div>
+
+              {/* Tags */}
+              <div>
+                <label htmlFor="sessionTags" className="block text-sm font-semibold text-gray-300 mb-3">
+                  Tags <span className="text-gray-500 text-xs">(optional)</span>
+                </label>
+                <div className="space-y-3">
+                  <div className="flex space-x-2">
+                    <input
+                      type="text"
+                      id="sessionTags"
+                      value={tagInput}
+                      onChange={(e) => setTagInput(e.target.value)}
+                      onKeyDown={handleTagInputKeyDown}
+                      placeholder="e.g., web, api, backend"
+                      className="flex-1 px-5 py-3 bg-gray-900/50 backdrop-blur border border-gray-700/50 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all text-base"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddTag}
+                      className="px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition-colors font-semibold"
+                    >
+                      Add
+                    </button>
+                  </div>
+                  {newSessionTags.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {newSessionTags.map((tag, index) => (
+                        <div
+                          key={index}
+                          className="flex items-center space-x-2 px-3 py-1.5 bg-blue-600/20 border border-blue-500/30 rounded-lg text-blue-300 text-sm"
+                        >
+                          <span>{tag}</span>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveTag(tag)}
+                            className="text-blue-400 hover:text-blue-200 transition-colors"
+                          >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Language Selector */}
@@ -653,6 +854,14 @@ export const Dashboard: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+      
+      {/* Keyboard Shortcuts Help */}
+      {showShortcutsHelp && (
+        <KeyboardShortcutsHelp
+          shortcuts={shortcuts}
+          onClose={() => setShowShortcutsHelp(false)}
+        />
       )}
     </div>
   );

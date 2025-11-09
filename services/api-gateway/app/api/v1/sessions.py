@@ -56,7 +56,10 @@ async def create_session(
         "is_active": True,
         "share_code": share_code,
         "created_at": now,
-        "updated_at": now
+        "updated_at": now,
+        "last_accessed_at": now,
+        "access_count": 0,
+        "tags": session.tags or []
     }
     
     await db.sessions.insert_one(new_session)
@@ -69,6 +72,7 @@ async def create_session(
 @router.get("/sessions", response_model=List[SessionResponse])
 async def list_sessions(
     language: str = None,
+    tags: str = None,  # Comma-separated tags
     current_user = Depends(get_current_user)
 ):
     """List all sessions where user is participant or owner"""
@@ -79,19 +83,19 @@ async def list_sessions(
     if language:
         query["language"] = language
     
+    # Filter by tags if provided (comma-separated)
+    if tags:
+        tag_list = [tag.strip() for tag in tags.split(",")]
+        query["tags"] = {"$all": tag_list}
+    
     sessions_cursor = db.sessions.find(query)
     user_sessions = []
     async for session in sessions_cursor:
         session.pop('_id', None)
         user_sessions.append(session)
     
-    logger.info(f"User {current_user.username} listing {len(user_sessions)} sessions")
-    return user_sessions
-    if language:
-        user_sessions = [s for s in user_sessions if s["language"] == language]
-    
     # Sort by updated_at descending
-    user_sessions.sort(key=lambda x: x["updated_at"], reverse=True)
+    user_sessions.sort(key=lambda x: x.get("updated_at", x.get("created_at")), reverse=True)
     
     logger.info(f"User {current_user.username} listing {len(user_sessions)} sessions")
     return user_sessions
@@ -103,6 +107,7 @@ async def get_session(
     current_user = Depends(get_current_user)
 ):
     """Get session by ID"""
+    db = get_database()
     session = await get_session_or_404(session_id)
     
     # Check if user has access
@@ -112,8 +117,23 @@ async def get_session(
             detail="You don't have access to this session"
         )
     
-    logger.info(f"User {current_user.username} fetching session {session_id}")
-    return session
+    # Track session access (activity tracking)
+    await db.sessions.update_one(
+        {"id": session_id},
+        {
+            "$set": {"last_accessed_at": datetime.utcnow().isoformat()},
+            "$inc": {"access_count": 1}
+        }
+    )
+    
+    # Sanitize user input for logging to prevent log injection
+    safe_username = current_user.username.replace('\n', '').replace('\r', '')
+    safe_session_id = session_id.replace('\n', '').replace('\r', '')
+    logger.info(f"User {safe_username} accessing session {safe_session_id}")
+    
+    # Return updated session with access tracking
+    updated_session = await get_session_or_404(session_id)
+    return updated_session
 
 
 @router.put("/sessions/{session_id}", response_model=SessionResponse)
@@ -141,6 +161,8 @@ async def update_session(
         update_fields["description"] = session_update.description
     if session_update.code is not None:
         update_fields["code"] = session_update.code
+    if session_update.tags is not None:
+        update_fields["tags"] = session_update.tags
     
     await db.sessions.update_one(
         {"id": session_id},
@@ -245,3 +267,54 @@ async def join_session_by_code(
     # Remove MongoDB _id
     session.pop('_id', None)
     return session
+
+
+@router.get("/sessions/{session_id}/export")
+async def export_session(
+    session_id: str,
+    current_user = Depends(get_current_user)
+):
+    """Export session code as downloadable file"""
+    from fastapi.responses import Response
+    
+    session = await get_session_or_404(session_id)
+    
+    # Check if user has access
+    if current_user.username not in session["participants"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You don't have access to this session"
+        )
+    
+    # Determine file extension based on language
+    extensions = {
+        "python": "py",
+        "javascript": "js",
+        "typescript": "ts",
+        "go": "go",
+        "rust": "rs",
+        "cpp": "cpp",
+        "c": "c",
+        "java": "java",
+        "vlang": "v",
+        "zig": "zig",
+        "elixir": "ex"
+    }
+    
+    ext = extensions.get(session["language"], "txt")
+    filename = f"{session['name'].replace(' ', '_')}.{ext}"
+    code = session.get("code", "")
+    
+    # Sanitize user input for logging to prevent log injection
+    safe_username = current_user.username.replace('\n', '').replace('\r', '')
+    safe_session_id = session_id.replace('\n', '').replace('\r', '')
+    logger.info(f"User {safe_username} exporting session {safe_session_id}")
+    
+    return Response(
+        content=code,
+        media_type="text/plain",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"'
+        }
+    )
+

@@ -77,8 +77,12 @@ export interface Session {
   participants: string[];
   share_code: string;
   created_at: string;
+  updated_at?: string;
+  last_accessed_at?: string;
+  access_count?: number;
   is_active: boolean;
   code?: string;
+  tags?: string[];
 }
 
 export interface CreateSessionData {
@@ -86,11 +90,14 @@ export interface CreateSessionData {
   language: string;
   description?: string;
   code?: string;
+  tags?: string[];
 }
 
 export const sessionsAPI = {
-  list: async (language?: string): Promise<Session[]> => {
-    const params = language ? { language } : {};
+  list: async (language?: string, tags?: string[]): Promise<Session[]> => {
+    const params: any = {};
+    if (language) params.language = language;
+    if (tags && tags.length > 0) params.tags = tags.join(',');
     const response = await api.get('/sessions', { params });
     return response.data;
   },
@@ -126,6 +133,29 @@ export const sessionsAPI = {
   joinByCode: async (shareCode: string): Promise<Session> => {
     const response = await api.post(`/sessions/join-by-code/${shareCode}`);
     return response.data;
+  },
+  
+  export: async (sessionId: string): Promise<Blob> => {
+    const response = await api.get(`/sessions/${sessionId}/export`, {
+      responseType: 'blob',
+    });
+    return response.data;
+  },
+};
+
+// Favorites API
+export const favoritesAPI = {
+  getFavorites: async (): Promise<string[]> => {
+    const response = await api.get('/users/favorites');
+    return response.data;
+  },
+  
+  addFavorite: async (sessionId: string): Promise<void> => {
+    await api.post(`/users/favorites/${sessionId}`);
+  },
+  
+  removeFavorite: async (sessionId: string): Promise<void> => {
+    await api.delete(`/users/favorites/${sessionId}`);
   },
 };
 
