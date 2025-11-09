@@ -549,7 +549,7 @@ async fn execute_zig(code: &str, timeout: u64) -> Result<(String, String, i32), 
     let compile_output = Command::new("zig")
         .args(&["build-exe", "main.zig"])
         .current_dir(&temp_dir)
-        .stdout(Stdio::piped())
+        .stdout(Stdio::null())  // Ignore compilation stdout
         .stderr(Stdio::piped())
         .output();
     
@@ -567,7 +567,7 @@ async fn execute_zig(code: &str, timeout: u64) -> Result<(String, String, i32), 
         return Err(format!("Zig compilation error:\n{}", stderr));
     }
     
-    // Execute the compiled binary
+    // Execute the compiled binary (only capture execution output, not compilation)
     let exe_path = format!("{}/main", temp_dir);
     let child = match Command::new(&exe_path)
         .current_dir(&temp_dir)
