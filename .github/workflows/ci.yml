@@ -239,6 +239,7 @@ jobs:
       with:
         context: ./services/${{ matrix.service }}
         push: false
+        load: true
         tags: codecollab-${{ matrix.service }}:test
         cache-from: type=gha
         cache-to: type=gha,mode=max
