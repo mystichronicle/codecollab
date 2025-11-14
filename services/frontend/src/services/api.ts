@@ -115,6 +115,7 @@ export const sessionsAPI = {
   update: async (sessionId: string, data: {
     name?: string;
     code?: string;
+    language?: string;
     is_active?: boolean;
   }): Promise<Session> => {
     const response = await api.put(`/sessions/${sessionId}`, data);

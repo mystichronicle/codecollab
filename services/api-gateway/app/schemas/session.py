@@ -17,6 +17,8 @@ class SessionCreate(BaseModel):
 class SessionUpdate(BaseModel):
     name: Optional[str] = None
     code: Optional[str] = None
+    language: Optional[str] = None
+    description: Optional[str] = None
     is_active: Optional[bool] = None
     tags: Optional[List[str]] = None
 

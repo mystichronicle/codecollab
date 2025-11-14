@@ -11,6 +11,8 @@ interface Participant {
 }
 
 const languageMap: Record<string, string> = {
+  plaintext: 'plaintext',
+  text: 'plaintext',
   python: 'python',
   javascript: 'javascript',
   typescript: 'typescript',
@@ -21,9 +23,12 @@ const languageMap: Record<string, string> = {
   elixir: 'elixir',
   java: 'java',
   cpp: 'cpp',
+  c: 'c',
 };
 
 const languageColors: Record<string, string> = {
+  plaintext: 'from-gray-500 to-gray-600',
+  text: 'from-gray-500 to-gray-600',
   python: 'from-blue-500 to-blue-600',
   javascript: 'from-yellow-500 to-yellow-600',
   typescript: 'from-blue-400 to-blue-500',
@@ -32,6 +37,9 @@ const languageColors: Record<string, string> = {
   vlang: 'from-purple-500 to-purple-600',
   zig: 'from-amber-500 to-amber-600',
   elixir: 'from-purple-400 to-purple-500',
+  cpp: 'from-blue-600 to-blue-700',
+  c: 'from-gray-600 to-gray-700',
+  java: 'from-red-500 to-red-600',
 };
 
 export const SessionEditor: React.FC = () => {
@@ -47,11 +55,84 @@ export const SessionEditor: React.FC = () => {
   const [error, setError] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [showOutput, setShowOutput] = useState(false);
+  const [currentLanguage, setCurrentLanguage] = useState('plaintext');
   
   const socketRef = useRef<WebSocket | null>(null);
   const editorRef = useRef<any>(null);
-  const saveTimeoutRef = useRef<number | null>(null);
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cursorDecorationsRef = useRef<Map<string, string[]>>(new Map());
+  const codeRef = useRef<string>('');
+  const languageRef = useRef<string>('plaintext');
+  const sessionIdRef = useRef<string | undefined>(sessionId);
+  const hasLoadedRef = useRef<boolean>(false); // Track if session has been loaded
+
+  // Keep refs in sync with state
+  useEffect(() => {
+    codeRef.current = code;
+    // Once we have code, mark as loaded
+    if (code && code.length > 0) {
+      hasLoadedRef.current = true;
+    }
+  }, [code]);
+
+  useEffect(() => {
+    languageRef.current = currentLanguage;
+    // If language is not plaintext, we've loaded real data
+    if (currentLanguage !== 'plaintext') {
+      hasLoadedRef.current = true;
+    }
+  }, [currentLanguage]);
+
+  useEffect(() => {
+    sessionIdRef.current = sessionId;
+  }, [sessionId]);
+
+  // Cleanup on unmount - save any pending changes
+  useEffect(() => {
+    const saveOnUnmount = () => {
+      const currentSessionId = sessionIdRef.current;
+      const currentCode = codeRef.current;
+      const currentLang = languageRef.current;
+      
+      if (!currentSessionId) {
+        return;
+      }
+      
+      const isInitialState = !currentCode && currentLang === 'plaintext';
+      if (isInitialState && !hasLoadedRef.current) {
+        return;
+      }
+      
+      const token = localStorage.getItem('access_token');
+      const url = `http://localhost:8000/api/v1/sessions/${currentSessionId}`;
+      const data = JSON.stringify({ 
+        code: currentCode || '', 
+        language: currentLang 
+      });
+      
+      fetch(url, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: data,
+        keepalive: true,
+      }).catch(err => {
+        console.error('Failed to save on unmount:', err);
+      });
+    };
+    
+    window.addEventListener('beforeunload', saveOnUnmount);
+    
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+      window.removeEventListener('beforeunload', saveOnUnmount);
+      saveOnUnmount();
+    };
+  }, []);
 
   useEffect(() => {
     if (sessionId) {
@@ -61,14 +142,18 @@ export const SessionEditor: React.FC = () => {
 
   useEffect(() => {
     if (session && sessionId) {
+      if (socketRef.current && socketRef.current.readyState !== WebSocket.CLOSED) {
+        socketRef.current.close();
+      }
       connectWebSocket();
     }
     return () => {
       if (socketRef.current) {
         socketRef.current.close();
+        socketRef.current = null;
       }
     };
-  }, [session, sessionId]);
+  }, [session?.id, sessionId]);
 
   // Update cursor decorations when participants change
   useEffect(() => {
@@ -115,8 +200,25 @@ export const SessionEditor: React.FC = () => {
   const loadSession = async () => {
     try {
       const data = await sessionsAPI.get(sessionId!);
+      
       setSession(data);
-      setCode(data.code || getDefaultCode(data.language));
+      
+      // Set code - make sure it's not undefined
+      const loadedCode = data.code || '';
+      setCode(loadedCode);
+      
+      // Set language
+      const loadedLanguage = data.language || 'plaintext';
+      setCurrentLanguage(loadedLanguage);
+      
+      // If editor is already mounted, set the value directly
+      if (editorRef.current && loadedCode) {
+        editorRef.current.setValue(loadedCode);
+      }
+      
+      // Mark that we've successfully loaded the session
+      hasLoadedRef.current = true;
+      
       setLoading(false);
     } catch (err: any) {
       console.error('Failed to load session:', err);
@@ -126,19 +228,34 @@ export const SessionEditor: React.FC = () => {
   };
 
   const connectWebSocket = () => {
-    // Connect to collaboration service using native WebSocket
+    if (socketRef.current) {
+      const state = socketRef.current.readyState;
+      if (state === WebSocket.OPEN || state === WebSocket.CONNECTING) {
+        return;
+      }
+    }
+    
     const token = localStorage.getItem('access_token');
     const wsUrl = `ws://localhost:8002/ws/${sessionId}`;
+    
+    let username = 'Anonymous';
+    if (token) {
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        username = payload.sub || payload.username || 'User';
+      } catch (e) {
+        console.error('Failed to decode token:', e);
+      }
+    }
     
     const socket = new WebSocket(wsUrl);
 
     socket.onopen = () => {
-      console.log('Connected to collaboration service');
-      // Send join message
       socket.send(JSON.stringify({
         type: 'join-session',
         sessionId: sessionId,
         token: token,
+        username: username,
       }));
     };
 
@@ -170,34 +287,13 @@ export const SessionEditor: React.FC = () => {
       console.error('WebSocket error:', error);
     };
 
-    socket.onclose = () => {
-      console.log('Disconnected from collaboration service');
-      // Optionally reconnect after a delay
-      setTimeout(() => {
-        if (session && sessionId) {
-          connectWebSocket();
-        }
-      }, 3000);
+    socket.onclose = (event) => {
+      if (event.code !== 1000) {
+        console.error('WebSocket closed unexpectedly:', event.code, event.reason);
+      }
     };
 
     socketRef.current = socket;
-  };
-
-  const getDefaultCode = (language: string): string => {
-    const defaults: Record<string, string> = {
-      python: '# Python code\ndef hello():\n    print("Hello, World!")\n\nhello()\n',
-      javascript: '// JavaScript code\nfunction hello() {\n  console.log("Hello, World!");\n}\n\nhello();\n',
-      typescript: '// TypeScript code\nfunction hello(): void {\n  console.log("Hello, World!");\n}\n\nhello();\n',
-      go: 'package main\n\nimport "fmt"\n\nfunc main() {\n\tfmt.Println("Hello, World!")\n}\n',
-      rust: 'fn main() {\n    println!("Hello, World!");\n}\n',
-      cpp: '#include <iostream>\n\nint main() {\n    std::cout << "Hello, World!" << std::endl;\n    return 0;\n}\n',
-      c: '#include <stdio.h>\n\nint main() {\n    printf("Hello, World!\\n");\n    return 0;\n}\n',
-      java: 'public class Main {\n    public static void main(String[] args) {\n        System.out.println("Hello, World!");\n    }\n}\n',
-      vlang: 'fn main() {\n\tprintln("Hello, World!")\n}\n',
-      zig: 'const std = @import("std");\n\npub fn main() !void {\n    std.debug.print("Hello, World!\\n", .{});\n}\n',
-      elixir: 'defmodule Hello do\n  def world do\n    IO.puts("Hello, World!")\n  end\nend\n\nHello.world()\n',
-    };
-    return defaults[language] || '// Start coding...\n';
   };
 
   const handleEditorChange = (value: string | undefined) => {
@@ -213,27 +309,41 @@ export const SessionEditor: React.FC = () => {
         }));
       }
 
-      // Auto-save after 2 seconds of no typing
+      // Auto-save after 1 second of no typing
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
       }
       saveTimeoutRef.current = setTimeout(() => {
-        saveCode(value);
-      }, 2000);
+        saveCode(value, currentLanguage);
+      }, 1000);
     }
   };
 
-  const saveCode = async (codeToSave: string) => {
+  const saveCode = async (codeToSave: string, languageToSave?: string) => {
     if (!sessionId) return;
     
     setIsSaving(true);
     try {
-      await sessionsAPI.update(sessionId, { code: codeToSave });
-      console.log('Code saved');
+      const updateData: any = { code: codeToSave };
+      if (languageToSave !== undefined) {
+        updateData.language = languageToSave;
+      }
+      await sessionsAPI.update(sessionId, updateData);
     } catch (err) {
       console.error('Failed to save code:', err);
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleLanguageChange = async (newLanguage: string) => {
+    setCurrentLanguage(newLanguage);
+    if (sessionId) {
+      try {
+        await sessionsAPI.update(sessionId, { language: newLanguage });
+      } catch (err) {
+        console.error('Failed to update language:', err);
+      }
     }
   };
 
@@ -251,7 +361,7 @@ export const SessionEditor: React.FC = () => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          language: session.language,
+          language: currentLanguage,
           code: code,
           timeout: 10,
         }),
@@ -286,6 +396,11 @@ export const SessionEditor: React.FC = () => {
   const handleEditorMount = (editor: any) => {
     editorRef.current = editor;
     
+    // If code is already loaded (from session data), set it in the editor
+    if (code) {
+      editor.setValue(code);
+    }
+    
     // Listen for cursor position changes
     editor.onDidChangeCursorPosition((e: any) => {
       if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
@@ -305,6 +420,7 @@ export const SessionEditor: React.FC = () => {
     if (confirm('Are you sure you want to leave this session?')) {
       if (socketRef.current) {
         socketRef.current.close();
+        socketRef.current = null;
       }
       navigate('/dashboard');
     }
@@ -372,7 +488,14 @@ export const SessionEditor: React.FC = () => {
           <h2 className="text-2xl font-bold text-white mb-2">Session Not Found</h2>
           <p className="text-gray-400 mb-6">{error || 'The session you are looking for does not exist.'}</p>
           <button
-            onClick={() => navigate('/dashboard')}
+            onClick={() => {
+              // Clean up WebSocket before navigating
+              if (socketRef.current) {
+                socketRef.current.close();
+                socketRef.current = null;
+              }
+              navigate('/dashboard');
+            }}
             className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
           >
             Back to Dashboard
@@ -398,21 +521,53 @@ export const SessionEditor: React.FC = () => {
             </button>
             
             <div className="flex items-center space-x-3">
-              <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${languageColors[session.language] || 'from-gray-600 to-gray-700'} flex items-center justify-center`}>
+              <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${languageColors[currentLanguage] || 'from-gray-600 to-gray-700'} flex items-center justify-center`}>
                 <span className="text-2xl">
-                  {session.language === 'python' ? '🐍' : 
-                   session.language === 'javascript' ? '📜' :
-                   session.language === 'typescript' ? '🔷' :
-                   session.language === 'go' ? '🐹' :
-                   session.language === 'rust' ? '🦀' :
-                   session.language === 'vlang' ? '⚡' :
-                   session.language === 'zig' ? '⚡' :
-                   session.language === 'elixir' ? '💧' : '📝'}
+                  {currentLanguage === 'plaintext' || currentLanguage === 'text' ? '📄' :
+                   currentLanguage === 'python' ? '🐍' : 
+                   currentLanguage === 'javascript' ? '📜' :
+                   currentLanguage === 'typescript' ? '🔷' :
+                   currentLanguage === 'go' ? '🐹' :
+                   currentLanguage === 'rust' ? '🦀' :
+                   currentLanguage === 'vlang' ? '⚡' :
+                   currentLanguage === 'zig' ? '⚡' :
+                   currentLanguage === 'elixir' ? '💧' :
+                   currentLanguage === 'cpp' ? '⚙️' :
+                   currentLanguage === 'c' ? '🔧' :
+                   currentLanguage === 'java' ? '☕' : '📝'}
                 </span>
               </div>
               <div>
                 <h1 className="text-xl font-bold text-white">{session.name}</h1>
-                <p className="text-sm text-gray-400">{session.language}</p>
+                <div className="flex items-center space-x-2">
+                  <svg className="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                  </svg>
+                  <select
+                    value={currentLanguage}
+                    onChange={(e) => handleLanguageChange(e.target.value)}
+                    className="text-sm font-medium text-white bg-gray-800/80 backdrop-blur px-4 py-1.5 rounded-lg border border-gray-600/50 hover:border-blue-500/50 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all cursor-pointer shadow-lg"
+                  >
+                    <option value="plaintext">📄 Plain Text</option>
+                    <optgroup label="Popular Languages">
+                      <option value="python">🐍 Python</option>
+                      <option value="javascript">📜 JavaScript</option>
+                      <option value="typescript">🔷 TypeScript</option>
+                      <option value="java">☕ Java</option>
+                    </optgroup>
+                    <optgroup label="Systems Programming">
+                      <option value="c">🔧 C</option>
+                      <option value="cpp">⚙️ C++</option>
+                      <option value="rust">🦀 Rust</option>
+                      <option value="go">🐹 Go</option>
+                    </optgroup>
+                    <optgroup label="Modern Languages">
+                      <option value="vlang">⚡ V Lang</option>
+                      <option value="zig">⚡ Zig</option>
+                      <option value="elixir">💧 Elixir</option>
+                    </optgroup>
+                  </select>
+                </div>
               </div>
             </div>
           </div>
@@ -441,25 +596,38 @@ export const SessionEditor: React.FC = () => {
             </div>
             
             {/* Participants */}
-            <div className="flex items-center space-x-2">
-              <div className="flex -space-x-2">
-                {participants.slice(0, 5).map((participant) => (
-                  <div
-                    key={participant.id}
-                    className="w-8 h-8 rounded-full border-2 border-gray-800 flex items-center justify-center text-white text-sm font-bold"
-                    style={{ backgroundColor: participant.color }}
-                    title={participant.username}
-                  >
-                    {participant.username.charAt(0).toUpperCase()}
+            <div className="flex items-center space-x-3">
+              {/* Online participants (WebSocket) */}
+              <div className="flex items-center space-x-2">
+                <div className="flex -space-x-2">
+                  {participants.slice(0, 5).map((participant) => (
+                    <div
+                      key={participant.id}
+                      className="w-8 h-8 rounded-full border-2 border-gray-800 flex items-center justify-center text-white text-sm font-bold"
+                      style={{ backgroundColor: participant.color }}
+                      title={`${participant.username} (online)`}
+                    >
+                      {participant.username.charAt(0).toUpperCase()}
+                    </div>
+                  ))}
+                  {participants.length > 5 && (
+                    <div className="w-8 h-8 rounded-full border-2 border-gray-800 bg-gray-700 flex items-center justify-center text-white text-xs font-bold">
+                      +{participants.length - 5}
+                    </div>
+                  )}
+                </div>
+                <div className="text-sm">
+                  <div className="flex items-center text-green-400">
+                    <div className="w-2 h-2 bg-green-400 rounded-full mr-1.5 animate-pulse"></div>
+                    <span className="font-semibold">{participants.length} online</span>
                   </div>
-                ))}
-                {participants.length > 5 && (
-                  <div className="w-8 h-8 rounded-full border-2 border-gray-800 bg-gray-700 flex items-center justify-center text-white text-xs font-bold">
-                    +{participants.length - 5}
-                  </div>
-                )}
+                  {session && session.participants && (
+                    <div className="text-gray-500 text-xs">
+                      {session.participants.length} total member{session.participants.length !== 1 ? 's' : ''}
+                    </div>
+                  )}
+                </div>
               </div>
-              <span className="text-gray-400 text-sm">{participants.length} online</span>
             </div>
 
             {/* Save Status */}
@@ -482,30 +650,32 @@ export const SessionEditor: React.FC = () => {
               <span>Export</span>
             </button>
 
-            {/* Run Button */}
-            <button
-              onClick={handleRunCode}
-              disabled={isRunning}
-              className={`px-6 py-2 rounded-lg font-semibold transition-all flex items-center space-x-2 ${
-                isRunning
-                  ? 'bg-gray-700 text-gray-400 cursor-not-allowed'
-                  : 'bg-green-600 hover:bg-green-700 text-white shadow-lg shadow-green-600/30'
-              }`}
-            >
-              {isRunning ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-white"></div>
-                  <span>Running</span>
-                </>
-              ) : (
-                <>
-                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
-                  </svg>
-                  <span>Run</span>
-                </>
-              )}
-            </button>
+            {/* Run Button - Hidden for plain text */}
+            {currentLanguage !== 'plaintext' && currentLanguage !== 'text' && (
+              <button
+                onClick={handleRunCode}
+                disabled={isRunning}
+                className={`px-6 py-2 rounded-lg font-semibold transition-all flex items-center space-x-2 ${
+                  isRunning
+                    ? 'bg-gray-700 text-gray-400 cursor-not-allowed'
+                    : 'bg-green-600 hover:bg-green-700 text-white shadow-lg shadow-green-600/30'
+                }`}
+              >
+                {isRunning ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-white"></div>
+                    <span>Running</span>
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
+                    </svg>
+                    <span>Run</span>
+                  </>
+                )}
+              </button>
+            )}
           </div>
         </div>
       </header>
@@ -515,8 +685,9 @@ export const SessionEditor: React.FC = () => {
         {/* Code Editor */}
         <div className={`${showOutput ? 'w-2/3' : 'w-full'} transition-all duration-300`}>
           <Editor
+            key={sessionId} // Force remount when session changes
             height="100%"
-            language={languageMap[session.language] || session.language}
+            language={languageMap[currentLanguage] || currentLanguage}
             value={code}
             onChange={handleEditorChange}
             onMount={handleEditorMount}
@@ -538,19 +709,32 @@ export const SessionEditor: React.FC = () => {
         {/* Output Panel */}
         {showOutput && (
           <div className="w-1/3 border-l border-gray-700 bg-gray-900 flex flex-col">
-            <div className="px-4 py-3 bg-gray-800 border-b border-gray-700 flex items-center justify-between">
-              <h3 className="font-semibold text-white">Output</h3>
+            <div className="bg-gray-800 border-b border-gray-700 px-4 py-3 flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                <span className="text-sm font-semibold text-white">Output</span>
+                {isRunning && (
+                  <div className="flex items-center space-x-2 text-blue-400">
+                    <div className="animate-spin rounded-full h-3 w-3 border-t-2 border-blue-400"></div>
+                    <span className="text-xs">Running...</span>
+                  </div>
+                )}
+              </div>
               <button
                 onClick={() => setShowOutput(false)}
-                className="text-gray-400 hover:text-white transition-colors"
+                className="text-gray-400 hover:text-white transition-colors p-1"
               >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
             </div>
             <div className="flex-1 overflow-auto p-4">
-              <pre className="text-sm text-gray-300 font-mono whitespace-pre-wrap">{output}</pre>
+              <pre className="text-sm text-gray-300 font-mono whitespace-pre-wrap">
+                {output || 'Click "Run Code" to see output here'}
+              </pre>
             </div>
           </div>
         )}

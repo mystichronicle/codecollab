@@ -4,4 +4,4 @@
 
 echo "🚀 Starting CodeCollab services..."
 
-docker-compose up --build
+docker compose up --build

@@ -56,6 +56,7 @@ type IncomingMessage struct {
 	Type      string                 `json:"type"`
 	SessionID string                 `json:"sessionId"`
 	Token     string                 `json:"token,omitempty"`
+	Username  string                 `json:"username,omitempty"`
 	Code      string                 `json:"code,omitempty"`
 	Cursor    map[string]interface{} `json:"cursor,omitempty"`
 }
@@ -243,7 +244,13 @@ func (c *Client) readPump(hub *Hub) {
 
 		switch inMsg.Type {
 		case "join-session":
-			// Already handled in connection setup
+			// Update username if provided
+			if inMsg.Username != "" {
+				c.Username = inMsg.Username
+				log.Printf("Client %s username set to: %s", c.ID, c.Username)
+				// Broadcast updated participant list
+				hub.broadcastParticipants(c.SessionID)
+			}
 			continue
 
 		case "code-change":

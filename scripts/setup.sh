@@ -13,8 +13,8 @@ if ! command -v docker &> /dev/null; then
 fi
 
 # Check if Docker Compose is installed
-if ! command -v docker-compose &> /dev/null; then
-    echo "❌ Docker Compose is not installed. Please install Docker Compose first."
+if ! command -v docker &> /dev/null || ! docker compose version &> /dev/null; then
+    echo "❌ Docker Compose is not installed. Please install Docker Compose (v2+) first."
     exit 1
 fi
 
@@ -104,7 +104,7 @@ echo ""
 echo "🎉 Setup complete!"
 echo ""
 echo "Next steps:"
-echo "  1. Build and start services: docker-compose up --build"
+echo "  1. Build and start services: docker compose up --build"
 echo "  2. Access the application:"
 echo "     - Frontend: http://localhost:3000"
 echo "     - API Gateway: http://localhost:8000"
@@ -112,7 +112,7 @@ echo "     - API Docs: http://localhost:8000/docs"
 echo "     - RabbitMQ Management: http://localhost:15672 (user: codecollab, pass: dev_password_change_in_prod)"
 echo ""
 echo "Useful commands:"
-echo "  - View logs: docker-compose logs -f"
-echo "  - Stop services: docker-compose down"
-echo "  - Rebuild: docker-compose up --build"
+echo "  - View logs: docker compose logs -f"
+echo "  - Stop services: docker compose down"
+echo "  - Rebuild: docker compose up --build"
 echo ""

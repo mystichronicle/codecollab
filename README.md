@@ -11,11 +11,14 @@
 ## Features
 
 ### Core Functionality
-- **Real-time Collaboration**: Multiple users can edit code simultaneously with live cursor tracking
+- **Real-time Collaboration**: Multiple users can edit code simultaneously with live cursor tracking and real-time participant presence
+- **Smart Participant Display**: See both online users in current session and total session members at a glance
+- **Real Username Display**: View actual usernames of collaborators extracted from JWT authentication
+- **Persistent Session State**: Auto-save code and language selection with instant restore on session reopen
 - **11 Programming Languages**: Python, JavaScript, TypeScript, Go, Rust, C, C++, Java, Zig, Elixir, V Lang
 - **Code Execution**: Run code directly in the browser with isolated execution environments
 - **Session Sharing**: Share sessions using 8-character codes
-- **Persistent Storage**: MongoDB-backed session storage
+- **Persistent Storage**: MongoDB-backed session storage with PostgreSQL for user management
 - **Monaco Editor**: Full-featured code editor with syntax highlighting and IntelliSense
 
 ### Security
@@ -28,10 +31,12 @@
 
 ## Prerequisites
 
-- **Docker** (v20.10+) and **Docker Compose** (v2.0+)
+- **Docker** (v20.10+) and **Docker Compose** plugin (v2.0+)
 - **Node.js** (v22+) and **npm** (v10+)
 - **Rust** (v1.83+) and **Cargo**
 - **Git**
+
+> **Note**: This project uses Docker Compose v2 (plugin syntax: `docker compose` instead of `docker-compose`). If you have the standalone `docker-compose` tool, please install the Docker Compose plugin.
 
 ### Optional (for language execution)
 - Python 3.11+
@@ -211,7 +216,7 @@ go run cmd/server/main.go
 
 ```bash
 # Build all Docker images
-docker-compose build
+docker compose build
 
 # Build execution service
 cd services/execution-service
@@ -327,22 +332,22 @@ lsof -ti:8002 | xargs kill -9  # Collaboration
 ### Docker Issues
 ```bash
 # Reset Docker environment
-docker-compose down -v
+docker compose down -v
 docker system prune -af
-docker-compose up -d
+docker compose up -d
 ```
 
 ### Database Connection Errors
 ```bash
 # Check database status
-docker-compose ps
+docker compose ps
 
 # View logs
-docker-compose logs mongodb
-docker-compose logs postgres
+docker compose logs mongodb
+docker compose logs postgres
 
 # Restart databases
-docker-compose restart mongodb postgres
+docker compose restart mongodb postgres
 ```
 
 ### Execution Service Not Starting
@@ -415,8 +420,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [x] Multi-language support (11 languages)
 - [x] Session sharing
 - [x] MongoDB persistence
-- [ ] AI code suggestions
-- [ ] Git integration
+- [x] Git integration
 - [ ] Terminal sharing
 - [ ] Video chat
 - [ ] Mobile app

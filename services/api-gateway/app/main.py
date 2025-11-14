@@ -11,6 +11,7 @@ from app.core.config import settings
 from app.core.mongodb import connect_to_mongo, close_mongo_connection
 from app.core.init_db import init_mongodb_indexes
 from app.api.v1 import health, users, sessions, auth, templates
+from app.api.v1.endpoints import git
 
 logging.basicConfig(
     level=logging.INFO,
@@ -72,6 +73,7 @@ app.include_router(auth.router, prefix="/api/v1/auth", tags=["authentication"])
 app.include_router(users.router, prefix="/api/v1", tags=["users"])
 app.include_router(sessions.router, prefix="/api/v1", tags=["sessions"])
 app.include_router(templates.router, prefix="/api/v1", tags=["templates"])
+app.include_router(git.router, prefix="/api/v1/git", tags=["git"])
 
 
 @app.on_event("startup")

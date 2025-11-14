@@ -161,8 +161,16 @@ async def update_session(
         update_fields["description"] = session_update.description
     if session_update.code is not None:
         update_fields["code"] = session_update.code
+        logger.info(f"Updating code for session {session_id}, code length: {len(session_update.code)}")
+    if session_update.language is not None:
+        update_fields["language"] = session_update.language
+        logger.info(f"Updating language for session {session_id} to: {session_update.language}")
+    if session_update.is_active is not None:
+        update_fields["is_active"] = session_update.is_active
     if session_update.tags is not None:
         update_fields["tags"] = session_update.tags
+    
+    logger.info(f"Update fields for session {session_id}: {list(update_fields.keys())}")
     
     await db.sessions.update_one(
         {"id": session_id},

@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, status, Depends
 from pydantic import BaseModel
 from typing import Optional, List
 from app.api.v1.auth import get_current_user
+from app.models.user import User
 from app.core.mongodb import get_database
 import logging
 
@@ -44,47 +45,39 @@ async def create_user(user: UserCreate):
 
 
 @router.get("/users/me", response_model=UserResponse)
-async def get_current_user():
+async def get_user_me(current_user: User = Depends(get_current_user)):
     """
     Get current authenticated user
     """
-    # This is a placeholder - will be implemented with authentication
     return {
-        "id": 1,
-        "email": "user@example.com",
-        "username": "testuser",
-        "full_name": "Test User",
-        "is_active": True,
-        "created_at": "2025-11-02T00:00:00Z"
+        "id": current_user.id,
+        "email": current_user.email,
+        "username": current_user.username,
+        "full_name": current_user.full_name,
+        "is_active": current_user.is_active,
+        "created_at": current_user.created_at.isoformat() if current_user.created_at else None
     }
 
 
-@router.get("/users/{user_id}", response_model=UserResponse)
-async def get_user(user_id: int):
-    """
-    Get user by ID
-    """
-    # This is a placeholder
-    if user_id < 1:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
-        )
+@router.get("/users/favorites", response_model=List[str])
+async def get_favorites(current_user: User = Depends(get_current_user)):
+    """Get user's favorite session IDs"""
+    db = get_database()
     
-    return {
-        "id": user_id,
-        "email": f"user{user_id}@example.com",
-        "username": f"user{user_id}",
-        "full_name": f"User {user_id}",
-        "is_active": True,
-        "created_at": "2025-11-02T00:00:00Z"
-    }
+    favorites_doc = await db.user_favorites.find_one({"user_id": current_user.id})
+    
+    if not favorites_doc:
+        return []
+    
+    favorite_ids = favorites_doc.get("favorite_sessions", [])
+    logger.info(f"User {current_user.username} has {len(favorite_ids)} favorite sessions")
+    return favorite_ids
 
 
 @router.post("/users/favorites/{session_id}", status_code=status.HTTP_200_OK)
 async def add_favorite(
     session_id: str,
-    current_user = Depends(get_current_user)
+    current_user: User = Depends(get_current_user)
 ):
     """Add a session to user's favorites"""
     db = get_database()
@@ -125,7 +118,7 @@ async def add_favorite(
 @router.delete("/users/favorites/{session_id}", status_code=status.HTTP_200_OK)
 async def remove_favorite(
     session_id: str,
-    current_user = Depends(get_current_user)
+    current_user: User = Depends(get_current_user)
 ):
     """Remove a session from user's favorites"""
     db = get_database()
@@ -142,17 +135,24 @@ async def remove_favorite(
     return {"message": "Session removed from favorites", "session_id": session_id}
 
 
-@router.get("/users/favorites", response_model=List[str])
-async def get_favorites(current_user = Depends(get_current_user)):
-    """Get user's favorite session IDs"""
-    db = get_database()
+@router.get("/users/{user_id}", response_model=UserResponse)
+async def get_user(user_id: int):
+    """
+    Get user by ID
+    """
+    # This is a placeholder
+    if user_id < 1:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
     
-    favorites_doc = await db.user_favorites.find_one({"user_id": current_user.id})
-    
-    if not favorites_doc:
-        return []
-    
-    favorite_ids = favorites_doc.get("favorite_sessions", [])
-    logger.info(f"User {current_user.username} has {len(favorite_ids)} favorite sessions")
-    return favorite_ids
+    return {
+        "id": user_id,
+        "email": f"user{user_id}@example.com",
+        "username": f"user{user_id}",
+        "full_name": f"User {user_id}",
+        "is_active": True,
+        "created_at": "2025-11-02T00:00:00Z"
+    }
 

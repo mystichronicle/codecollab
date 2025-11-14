@@ -4,6 +4,7 @@ import { Login } from './components/Login';
 import { Register } from './components/Register';
 import { Dashboard } from './components/Dashboard';
 import { SessionEditor } from './components/SessionEditor';
+import { GitWorkspace } from './components/GitWorkspace';
 import CodeSession from './components/CodeSession';
 import './App.css';
 
@@ -23,6 +24,14 @@ function App() {
           element={
             <ProtectedRoute>
               <Dashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/git"
+          element={
+            <ProtectedRoute>
+              <GitWorkspace />
             </ProtectedRoute>
           }
         />

@@ -26,5 +26,5 @@ docker compose down
 echo ""
 echo "✅ All services stopped"
 echo ""
-echo "💡 Tip: To remove all data volumes, run: docker-compose down -v"
+echo "💡 Tip: To remove all data volumes, run: docker compose down -v"
 echo ""

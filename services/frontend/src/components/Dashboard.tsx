@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { sessionsAPI, authAPI, Session, favoritesAPI } from '../services/api';
+import { gitService, GitWorkspace } from '../services/gitService';
 import { DashboardSkeleton } from './LoadingSkeleton';
 import { ErrorAlert, SuccessAlert } from './ErrorAlert';
 import { SessionStats } from './SessionStats';
@@ -18,6 +19,7 @@ interface User {
 }
 
 const languageColors: Record<string, { bg: string; badge: string; icon: string }> = {
+  plaintext: { bg: 'from-gray-500/10 to-gray-600/5', badge: 'from-gray-500 to-gray-600', icon: '📄' },
   python: { bg: 'from-blue-500/10 to-blue-600/5', badge: 'from-blue-500 to-blue-600', icon: '🐍' },
   javascript: { bg: 'from-yellow-500/10 to-yellow-600/5', badge: 'from-yellow-500 to-yellow-600', icon: '📜' },
   typescript: { bg: 'from-blue-400/10 to-blue-500/5', badge: 'from-blue-400 to-blue-500', icon: '🔷' },
@@ -34,13 +36,13 @@ const languageColors: Record<string, { bg: string; badge: string; icon: string }
 export const Dashboard: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
   const [sessions, setSessions] = useState<Session[]>([]);
+  const [workspaces, setWorkspaces] = useState<GitWorkspace[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [newSessionName, setNewSessionName] = useState('');
-  const [newSessionLanguage, setNewSessionLanguage] = useState('python');
   const [newSessionDescription, setNewSessionDescription] = useState('');
   const [newSessionTags, setNewSessionTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState('');
@@ -90,8 +92,10 @@ export const Dashboard: React.FC = () => {
     if (user) {
       loadSessions();
       loadFavorites();
+      loadWorkspaces();
     }
-  }, [user, filterLanguage]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, filterLanguage]); // Only re-run when user ID or filter changes
 
   const loadFavorites = async () => {
     try {
@@ -99,6 +103,17 @@ export const Dashboard: React.FC = () => {
       setFavorites(favoriteIds);
     } catch (err) {
       console.error('Failed to load favorites:', err);
+    }
+  };
+
+  const loadWorkspaces = async () => {
+    try {
+      const result = await gitService.listWorkspaces();
+      if (result.success) {
+        setWorkspaces(result.workspaces);
+      }
+    } catch (err) {
+      console.error('Failed to load workspaces:', err);
     }
   };
 
@@ -124,7 +139,6 @@ export const Dashboard: React.FC = () => {
       const lang = filterLanguage === 'all' ? undefined : filterLanguage;
       const data = await sessionsAPI.list(lang);
       setSessions(data);
-      console.log('Loaded sessions from API:', data);
     } catch (err: any) {
       console.error('Failed to load sessions:', err);
     }
@@ -141,7 +155,7 @@ export const Dashboard: React.FC = () => {
     try {
       const newSession = await sessionsAPI.create({
         name: newSessionName.trim(),
-        language: newSessionLanguage,
+        language: 'plaintext', // Default to plain text, can be changed in session
         description: newSessionDescription.trim() || undefined,
         tags: newSessionTags,
       });
@@ -150,7 +164,6 @@ export const Dashboard: React.FC = () => {
       setShowCreateModal(false);
       setNewSessionName('');
       setNewSessionDescription('');
-      setNewSessionLanguage('python');
       setNewSessionTags([]);
       setTagInput('');
       setSuccessMessage(`Session "${newSession.name}" created successfully!`);
@@ -281,7 +294,7 @@ export const Dashboard: React.FC = () => {
               <div className="relative">
                 <div className="w-12 h-12 bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 rounded-xl flex items-center justify-center transform hover:scale-110 transition-transform duration-200 shadow-lg shadow-blue-500/50">
                   <svg className="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/>
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                   </svg>
                 </div>
                 <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-gray-900 animate-pulse"></div>
@@ -329,7 +342,7 @@ export const Dashboard: React.FC = () => {
         {sessions.length > 0 && <SessionStats sessions={sessions} />}
 
         {/* Header Actions */}
-        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center justify-between mb-8">
           <div>
             <h2 className="text-3xl font-bold text-white mb-2 bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-500">
               Your Sessions
@@ -337,6 +350,17 @@ export const Dashboard: React.FC = () => {
             <p className="text-gray-400">Create or join collaborative coding sessions</p>
           </div>
           <div className="flex gap-3">
+            <button
+              onClick={() => navigate('/git')}
+              className="group px-6 py-3.5 text-sm font-semibold text-white bg-gradient-to-r from-orange-600 to-red-600 rounded-xl hover:from-orange-700 hover:to-red-700 focus:outline-none focus:ring-2 focus:ring-orange-500/50 transition-all duration-200 shadow-lg shadow-orange-500/30 hover:shadow-orange-500/50 hover:scale-105 transform"
+            >
+              <span className="flex items-center">
+                <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 92 92">
+                  <path d="M90.156 41.965L50.036 1.848c-2.467-2.467-6.47-2.467-8.937 0l-8.332 8.332 10.562 10.562c2.623-.872 5.63-.292 7.72 1.798 2.102 2.109 2.678 5.134 1.78 7.768l10.185 10.185c2.634-.898 5.659-.322 7.768 1.78 2.93 2.93 2.93 7.678 0 10.607-2.93 2.93-7.678 2.93-10.607 0-2.21-2.21-2.755-5.458-1.64-8.177L48.73 34.899v29.75c.715.346 1.39.808 1.992 1.41 2.93 2.93 2.93 7.678 0 10.607-2.93 2.93-7.678 2.93-10.607 0-2.93-2.93-2.93-7.678 0-10.607.719-.719 1.545-1.293 2.446-1.722V34.28c-.9-.43-1.727-1.004-2.446-1.722-2.223-2.223-2.762-5.486-1.623-8.214L27.83 13.688 1.848 39.67c-2.467 2.467-2.467 6.47 0 8.937l40.12 40.117c2.467 2.467 6.47 2.467 8.937 0l39.95-39.95c2.468-2.467 2.468-6.47.001-8.937" />
+                </svg>
+                Git Workspace
+              </span>
+            </button>
             <button
               onClick={() => setShowJoinModal(true)}
               className="group px-6 py-3.5 text-sm font-semibold text-white bg-gradient-to-r from-green-600 to-teal-600 rounded-xl hover:from-green-700 hover:to-teal-700 focus:outline-none focus:ring-2 focus:ring-green-500/50 transition-all duration-200 shadow-lg shadow-green-500/30 hover:shadow-green-500/50 hover:scale-105 transform"
@@ -360,9 +384,7 @@ export const Dashboard: React.FC = () => {
               </span>
             </button>
           </div>
-        </div>
-
-        {/* Search and Filter */}
+        </div>        {/* Search and Filter */}
         <div className="mb-8 flex flex-col sm:flex-row gap-4">
           <div className="flex-1 relative group">
             <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
@@ -433,6 +455,7 @@ export const Dashboard: React.FC = () => {
 
         {/* Sessions Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {/* Session Cards */}
           {filteredSessions.map((session) => {
             const langColor = languageColors[session.language] || languageColors.python;
             return (
@@ -541,10 +564,81 @@ export const Dashboard: React.FC = () => {
               </div>
             );
           })}
+
+          {/* Git Workspace Cards */}
+          {workspaces.map((workspace) => (
+            <div
+              key={workspace.workspace_id}
+              className="group relative bg-gradient-to-br from-orange-900/30 to-red-900/30 backdrop-blur rounded-2xl p-6 border border-orange-700/50 hover:border-orange-600/50 transition-all duration-300 hover:shadow-2xl hover:shadow-orange-500/10 hover:-translate-y-1 cursor-pointer"
+              onClick={() => navigate('/git')}
+            >
+              {/* Git Badge */}
+              <div className="absolute -top-3 -right-3">
+                <div className="px-4 py-2 bg-gradient-to-r from-orange-600 to-red-600 rounded-xl shadow-lg transform group-hover:scale-110 transition-transform duration-200">
+                  <span className="text-white font-bold text-sm uppercase tracking-wider flex items-center">
+                    <svg className="w-4 h-4 mr-1.5" fill="currentColor" viewBox="0 0 92 92">
+                      <path d="M90.156 41.965L50.036 1.848c-2.467-2.467-6.47-2.467-8.937 0l-8.332 8.332 10.562 10.562c2.623-.872 5.63-.292 7.72 1.798 2.102 2.109 2.678 5.134 1.78 7.768l10.185 10.185c2.634-.898 5.659-.322 7.768 1.78 2.93 2.93 2.93 7.678 0 10.607-2.93 2.93-7.678 2.93-10.607 0-2.21-2.21-2.755-5.458-1.64-8.177L48.73 34.899v29.75c.715.346 1.39.808 1.992 1.41 2.93 2.93 2.93 7.678 0 10.607-2.93 2.93-7.678 2.93-10.607 0-2.93-2.93-2.93-7.678 0-10.607.719-.719 1.545-1.293 2.446-1.722V34.28c-.9-.43-1.727-1.004-2.446-1.722-2.223-2.223-2.762-5.486-1.623-8.214L27.83 13.688 1.848 39.67c-2.467 2.467-2.467 6.47 0 8.937l40.12 40.117c2.467 2.467 6.47 2.467 8.937 0l39.95-39.95c2.468-2.467 2.468-6.47.001-8.937" />
+                    </svg>
+                    GIT REPO
+                  </span>
+                </div>
+              </div>
+
+              {/* Workspace Content */}
+              <div className="mt-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-xl font-bold text-white group-hover:text-orange-400 transition-colors line-clamp-2 flex-1">
+                    {workspace.name}
+                  </h3>
+                  {workspace.is_dirty && (
+                    <span className="ml-2 px-2 py-1 text-xs font-semibold bg-yellow-500/20 text-yellow-400 rounded-lg border border-yellow-500/30">
+                      Modified
+                    </span>
+                  )}
+                </div>
+
+                {/* Repository Info */}
+                <div className="flex flex-wrap gap-2 mt-3">
+                  <div className="flex items-center text-sm text-orange-300 bg-orange-900/30 px-3 py-1.5 rounded-lg border border-orange-700/30">
+                    <svg className="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14"/>
+                    </svg>
+                    <span className="font-medium">{workspace.branch}</span>
+                  </div>
+                  <div className="flex items-center text-sm text-gray-300 bg-gray-800/50 px-3 py-1.5 rounded-lg border border-gray-700/30">
+                    <svg className="w-4 h-4 mr-1.5" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd"/>
+                    </svg>
+                    <span className="font-medium">{workspace.commit_count} commits</span>
+                  </div>
+                </div>
+
+                {/* Remote URL */}
+                {workspace.remote_url && (
+                  <div className="mt-3 text-xs text-gray-400 truncate font-mono bg-gray-900/50 px-3 py-2 rounded-lg border border-gray-700/30">
+                    {workspace.remote_url}
+                  </div>
+                )}
+
+                {/* Open Button */}
+                <div className="mt-4 pt-4 border-t border-orange-700/50">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-400 font-medium">Click to open</span>
+                    <svg className="w-5 h-5 text-gray-400 group-hover:text-orange-400 group-hover:translate-x-1 transition-all" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6"/>
+                    </svg>
+                  </div>
+                </div>
+              </div>
+
+              {/* Hover Glow Effect */}
+              <div className="absolute inset-0 bg-gradient-to-br from-orange-600/20 to-red-600/20 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 -z-10"></div>
+            </div>
+          ))}
         </div>
 
         {/* No Results State */}
-        {filteredSessions.length === 0 && sessions.length > 0 && (
+        {filteredSessions.length === 0 && workspaces.length === 0 && sessions.length > 0 && (
           <NoResultsState
             searchQuery={searchQuery}
             filterLanguage={filterLanguage}
@@ -556,15 +650,15 @@ export const Dashboard: React.FC = () => {
         )}
 
         {/* Empty State */}
-        {sessions.length === 0 && (
+        {sessions.length === 0 && workspaces.length === 0 && (
           <EmptyState
             icon={
               <svg className="w-10 h-10 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/>
               </svg>
             }
-            title="No sessions yet"
-            description="Create your first coding session to start collaborating with others in real-time"
+            title="No sessions or repositories yet"
+            description="Create your first coding session or clone a Git repository to start collaborating"
             action={{
               label: 'Create Your First Session',
               onClick: () => setShowCreateModal(true),
@@ -575,48 +669,71 @@ export const Dashboard: React.FC = () => {
 
       {/* Create Session Modal */}
       {showCreateModal && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
-          <div className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-3xl shadow-2xl max-w-lg w-full p-8 border border-gray-700/50 animate-slideUp relative overflow-hidden">
+        <div className="fixed inset-0 bg-black/95 backdrop-blur-lg flex items-center justify-center p-4 z-50 animate-fadeIn">
+          <div className="bg-gradient-to-br from-slate-900 via-gray-900 to-slate-950 rounded-3xl shadow-2xl max-w-2xl w-full max-h-[92vh] overflow-y-auto border border-purple-500/20 animate-slideUp relative">
             {/* Decorative Background Elements */}
-            <div className="absolute top-0 right-0 w-64 h-64 bg-purple-500/10 rounded-full blur-3xl -z-10"></div>
-            <div className="absolute bottom-0 left-0 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl -z-10"></div>
+            <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-br from-purple-600/30 to-blue-600/30 rounded-full blur-3xl -z-10 pointer-events-none animate-pulse"></div>
+            <div className="absolute bottom-0 left-0 w-96 h-96 bg-gradient-to-tr from-blue-600/30 to-pink-600/30 rounded-full blur-3xl -z-10 pointer-events-none animate-pulse" style={{ animationDelay: '1s' }}></div>
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full bg-gradient-to-r from-purple-600/10 via-transparent to-blue-600/10 rounded-3xl -z-10 pointer-events-none"></div>
             
-            {/* Modal Header */}
-            <div className="flex justify-between items-center mb-8">
-              <div>
-                <h3 className="text-3xl font-bold text-white mb-1">Create Session</h3>
-                <p className="text-gray-400 text-sm">Start a new collaboration workspace</p>
+            {/* Modal Header - Sticky */}
+            <div className="sticky top-0 bg-gradient-to-br from-slate-900/95 via-gray-900/95 to-slate-950/95 z-20 px-8 pt-8 pb-6 border-b border-purple-500/20 backdrop-blur-xl">
+              <div className="flex justify-between items-start">
+                <div>
+                  <div className="flex items-center space-x-3 mb-3">
+                    <div className="p-3 bg-gradient-to-br from-purple-500 via-blue-500 to-pink-500 rounded-2xl shadow-lg shadow-purple-500/50 animate-pulse">
+                      <svg className="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                      </svg>
+                    </div>
+                    <h3 className="text-5xl font-black bg-gradient-to-r from-purple-400 via-blue-400 to-pink-400 bg-clip-text text-transparent drop-shadow-2xl">
+                      Create Session
+                    </h3>
+                  </div>
+                  <p className="text-gray-400 text-sm ml-16 font-medium">✨ Start a new collaboration workspace</p>
+                </div>
+                <button
+                  onClick={() => setShowCreateModal(false)}
+                  className="text-gray-400 hover:text-white transition-all p-3 hover:bg-red-500/20 rounded-xl hover:rotate-90 duration-300 group"
+                >
+                  <svg className="w-6 h-6 group-hover:scale-110 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/>
+                  </svg>
+                </button>
               </div>
-              <button
-                onClick={() => setShowCreateModal(false)}
-                className="text-gray-400 hover:text-white transition-colors p-2 hover:bg-gray-700/50 rounded-xl"
-              >
-                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/>
-                </svg>
-              </button>
             </div>
 
             {/* Modal Content */}
-            <div className="space-y-6">
+            <div className="px-8 py-6 space-y-7">
               {/* Session Name Input */}
-              <div>
-                <label htmlFor="sessionName" className="block text-sm font-semibold text-gray-300 mb-3">
-                  Session Name <span className="text-red-400">*</span>
+              <div className="group">
+                <label htmlFor="sessionName" className="flex items-center text-sm font-bold text-gray-200 mb-3">
+                  <span className="bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent text-base">Session Name</span>
+                  <span className="text-red-400 ml-1.5 text-lg">*</span>
                 </label>
                 <div className="relative">
+                  <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-purple-400 transition-colors duration-300">
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                    </svg>
+                  </div>
                   <input
                     type="text"
                     id="sessionName"
                     value={newSessionName}
                     onChange={(e) => setNewSessionName(e.target.value)}
                     placeholder="e.g., Python API Development"
-                    className="w-full px-5 py-4 bg-gray-900/50 backdrop-blur border border-gray-700/50 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all text-base"
+                    className="w-full pl-12 pr-12 py-4 bg-slate-900/90 backdrop-blur border-2 border-gray-700/50 rounded-2xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 transition-all text-base hover:border-gray-600/50 shadow-lg"
                     autoFocus
                   />
                   {newSessionName && (
                     <div className="absolute right-4 top-1/2 -translate-y-1/2">
-                      <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                      <div className="flex items-center space-x-1 animate-fadeIn">
+                        <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                        <svg className="w-5 h-5 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -624,8 +741,8 @@ export const Dashboard: React.FC = () => {
 
               {/* Description */}
               <div>
-                <label htmlFor="sessionDescription" className="block text-sm font-semibold text-gray-300 mb-3">
-                  Description <span className="text-gray-500 text-xs">(optional)</span>
+                <label htmlFor="sessionDescription" className="block text-sm font-bold text-gray-200 mb-3">
+                  Description <span className="text-gray-500 text-xs font-normal">(optional)</span>
                 </label>
                 <textarea
                   id="sessionDescription"
@@ -633,14 +750,14 @@ export const Dashboard: React.FC = () => {
                   onChange={(e) => setNewSessionDescription(e.target.value)}
                   placeholder="e.g., Building REST APIs with FastAPI"
                   rows={3}
-                  className="w-full px-5 py-4 bg-gray-900/50 backdrop-blur border border-gray-700/50 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all text-base resize-none"
+                  className="w-full px-5 py-4 bg-slate-900/90 backdrop-blur border-2 border-gray-700/50 rounded-2xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 transition-all text-base resize-none hover:border-gray-600/50 shadow-lg"
                 />
               </div>
 
               {/* Tags */}
               <div>
-                <label htmlFor="sessionTags" className="block text-sm font-semibold text-gray-300 mb-3">
-                  Tags <span className="text-gray-500 text-xs">(optional)</span>
+                <label htmlFor="sessionTags" className="block text-sm font-bold text-gray-200 mb-3">
+                  Tags <span className="text-gray-500 text-xs font-normal">(optional)</span>
                 </label>
                 <div className="space-y-3">
                   <div className="flex space-x-2">
@@ -651,28 +768,28 @@ export const Dashboard: React.FC = () => {
                       onChange={(e) => setTagInput(e.target.value)}
                       onKeyDown={handleTagInputKeyDown}
                       placeholder="e.g., web, api, backend"
-                      className="flex-1 px-5 py-3 bg-gray-900/50 backdrop-blur border border-gray-700/50 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all text-base"
+                      className="flex-1 px-5 py-3 bg-slate-900/90 backdrop-blur border-2 border-gray-700/50 rounded-2xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 transition-all text-base hover:border-gray-600/50 shadow-lg"
                     />
                     <button
                       type="button"
                       onClick={handleAddTag}
-                      className="px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition-colors font-semibold"
+                      className="px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white rounded-2xl transition-all font-bold shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50 hover:scale-105 transform"
                     >
                       Add
                     </button>
                   </div>
                   {newSessionTags.length > 0 && (
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-wrap gap-2 animate-fadeIn">
                       {newSessionTags.map((tag, index) => (
                         <div
                           key={index}
-                          className="flex items-center space-x-2 px-3 py-1.5 bg-blue-600/20 border border-blue-500/30 rounded-lg text-blue-300 text-sm"
+                          className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-purple-600/20 to-blue-600/20 border border-purple-500/40 rounded-xl text-purple-300 text-sm font-medium shadow-lg backdrop-blur hover:scale-105 transition-transform"
                         >
-                          <span>{tag}</span>
+                          <span>#{tag}</span>
                           <button
                             type="button"
                             onClick={() => handleRemoveTag(tag)}
-                            className="text-blue-400 hover:text-blue-200 transition-colors"
+                            className="text-purple-400 hover:text-red-400 transition-colors"
                           >
                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -685,67 +802,26 @@ export const Dashboard: React.FC = () => {
                 </div>
               </div>
 
-              {/* Language Selector */}
-              <div>
-                <label htmlFor="language" className="block text-sm font-semibold text-gray-300 mb-3">
-                  Programming Language
-                </label>
-                <div className="grid grid-cols-2 gap-3">
-                  {[
-                    { value: 'python', label: 'Python', icon: '🐍', color: 'from-blue-500 to-blue-600' },
-                    { value: 'javascript', label: 'JavaScript', icon: '📜', color: 'from-yellow-500 to-yellow-600' },
-                    { value: 'typescript', label: 'TypeScript', icon: '🔷', color: 'from-blue-400 to-blue-500' },
-                    { value: 'go', label: 'Go', icon: '🐹', color: 'from-cyan-500 to-cyan-600' },
-                    { value: 'rust', label: 'Rust', icon: '🦀', color: 'from-orange-500 to-orange-600' },
-                    { value: 'cpp', label: 'C++', icon: '⚙️', color: 'from-blue-600 to-blue-700' },
-                    { value: 'c', label: 'C', icon: '🔧', color: 'from-gray-500 to-gray-600' },
-                    { value: 'java', label: 'Java', icon: '☕', color: 'from-red-500 to-red-600' },
-                    { value: 'vlang', label: 'V Lang', icon: '⚡', color: 'from-purple-500 to-purple-600' },
-                    { value: 'zig', label: 'Zig', icon: '⚡', color: 'from-amber-500 to-amber-600' },
-                    { value: 'elixir', label: 'Elixir', icon: '💧', color: 'from-purple-400 to-purple-500' },
-                  ].map((lang) => (
-                    <button
-                      key={lang.value}
-                      type="button"
-                      onClick={() => setNewSessionLanguage(lang.value)}
-                      className={`p-4 rounded-xl border-2 transition-all duration-200 ${
-                        newSessionLanguage === lang.value
-                          ? `border-blue-500 bg-blue-500/10 shadow-lg shadow-blue-500/20`
-                          : 'border-gray-700/50 bg-gray-900/30 hover:border-gray-600/50 hover:bg-gray-800/50'
-                      }`}
-                    >
-                      <div className="flex items-center space-x-3">
-                        <div className={`text-2xl ${newSessionLanguage === lang.value ? 'scale-110' : ''} transition-transform`}>
-                          {lang.icon}
-                        </div>
-                        <span className={`font-semibold ${newSessionLanguage === lang.value ? 'text-white' : 'text-gray-400'}`}>
-                          {lang.label}
-                        </span>
-                      </div>
-                      {newSessionLanguage === lang.value && (
-                        <div className="mt-2 flex justify-end">
-                          <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                        </div>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
               {/* Action Buttons */}
-              <div className="flex space-x-4 pt-6">
+              <div className="flex space-x-4 pt-8 sticky bottom-0 bg-gradient-to-br from-slate-900/95 via-gray-900/95 to-slate-950/95 pb-4 border-t border-purple-500/20 backdrop-blur-xl -mx-8 px-8">
                 <button
                   onClick={() => setShowCreateModal(false)}
-                  className="flex-1 px-6 py-4 text-base font-semibold text-gray-300 bg-gray-800/50 backdrop-blur rounded-xl hover:bg-gray-700/50 focus:outline-none focus:ring-2 focus:ring-gray-500/50 transition-all border border-gray-700/50"
+                  className="flex-1 px-6 py-4 text-base font-bold text-gray-300 bg-slate-800/80 backdrop-blur rounded-2xl hover:bg-slate-700/80 focus:outline-none focus:ring-2 focus:ring-gray-500/50 transition-all border-2 border-gray-600/50 hover:border-gray-500/50 hover:scale-105 transform shadow-lg"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleCreateSession}
                   disabled={!newSessionName.trim()}
-                  className="flex-1 px-6 py-4 text-base font-semibold text-white bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 rounded-xl hover:from-blue-700 hover:via-purple-700 hover:to-pink-700 focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50 disabled:shadow-none hover:scale-105 transform disabled:transform-none"
+                  className="flex-1 px-6 py-4 text-base font-black text-white bg-gradient-to-r from-purple-600 via-blue-600 to-pink-600 rounded-2xl hover:from-purple-700 hover:via-blue-700 hover:to-pink-700 focus:outline-none focus:ring-4 focus:ring-purple-500/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-2xl shadow-purple-500/50 hover:shadow-purple-500/70 disabled:shadow-none hover:scale-110 transform disabled:transform-none animate-pulse disabled:animate-none relative overflow-hidden group"
                 >
-                  Create Session
+                  <span className="relative z-10 flex items-center justify-center space-x-2">
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                    <span>Create Session</span>
+                  </span>
+                  <div className="absolute inset-0 bg-gradient-to-r from-pink-600 via-purple-600 to-blue-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                 </button>
               </div>
             </div>

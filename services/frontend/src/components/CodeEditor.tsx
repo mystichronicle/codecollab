@@ -32,7 +32,6 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
   const editorRef = useRef<any>(null);
 
   useEffect(() => {
-    // Connect to WebSocket collaboration service
     const socket = io('http://localhost:8002', {
       transports: ['websocket'],
       reconnection: true,
@@ -41,13 +40,11 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
     socketRef.current = socket;
 
     socket.on('connect', () => {
-      console.log('Connected to collaboration service');
       setIsConnected(true);
       socket.emit('join', { sessionId, username: localStorage.getItem('username') || 'Anonymous' });
     });
 
     socket.on('disconnect', () => {
-      console.log('Disconnected from collaboration service');
       setIsConnected(false);
     });
 
