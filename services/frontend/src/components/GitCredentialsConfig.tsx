@@ -25,6 +25,13 @@ export const GitCredentialsConfig: React.FC<GitCredentialsConfigProps> = ({
       return;
     }
 
+    // Validate token format (basic check for GitHub PAT format)
+    const trimmedToken = token.trim();
+    if (!trimmedToken.startsWith('ghp_') && !trimmedToken.startsWith('github_pat_') && !trimmedToken.startsWith('gho_')) {
+      setError('Invalid token format. GitHub PATs typically start with ghp_, github_pat_, or gho_');
+      return;
+    }
+
     setIsLoading(true);
     setError('');
     setSuccess('');
@@ -32,8 +39,12 @@ export const GitCredentialsConfig: React.FC<GitCredentialsConfigProps> = ({
     try {
       await gitService.configureCredentials(sessionId, {
         github_username: username.trim(),
-        github_token: token.trim(),
+        github_token: trimmedToken,
       });
+      
+      // Clear sensitive data from state immediately after use
+      setToken('');
+      setUsername('');
       
       setSuccess('Credentials configured successfully! You can now push and pull.');
       setTimeout(() => {
@@ -43,7 +54,9 @@ export const GitCredentialsConfig: React.FC<GitCredentialsConfigProps> = ({
         onClose();
       }, 2000);
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to configure credentials');
+      // Clear token on error as well to minimize exposure time
+      setToken('');
+      setError(err.response?.data?.error || 'Failed to configure credentials. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -153,10 +166,12 @@ export const GitCredentialsConfig: React.FC<GitCredentialsConfigProps> = ({
           <div className="text-xs text-yellow-400 bg-yellow-500/10 border border-yellow-500 p-3 space-y-2">
             <p><strong>[ WARNING ] SECURITY_NOTES:</strong></p>
             <ul className="ml-4 space-y-1 list-disc text-yellow-300">
-              <li>Your token is embedded in the repository URL for this session only</li>
+              <li>Token is transmitted securely and cleared from memory after use</li>
               <li>Token is NOT stored in any database or logs</li>
               <li>Use tokens with minimal required permissions (repo access only)</li>
+              <li>Set token expiration in GitHub settings</li>
               <li>Revoke tokens from GitHub when no longer needed</li>
+              <li>Never share your PAT with anyone</li>
             </ul>
           </div>
         </div>

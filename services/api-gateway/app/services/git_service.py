@@ -1,6 +1,7 @@
 """Git operations service for repository management."""
 
 import os
+import re
 import shutil
 from typing import List, Dict, Optional
 from pathlib import Path
@@ -13,13 +14,103 @@ logger = logging.getLogger(__name__)
 REPOS_BASE_PATH = Path("/tmp/codecollab_repos")
 REPOS_BASE_PATH.mkdir(exist_ok=True)
 
+# Regex pattern for valid session IDs (alphanumeric, hyphens, underscores only)
+VALID_SESSION_ID_PATTERN = re.compile(r'^[a-zA-Z0-9_-]+$')
+# Maximum session ID length
+MAX_SESSION_ID_LENGTH = 128
+# Maximum file path length
+MAX_FILE_PATH_LENGTH = 1024
+
+
+def _validate_session_id(session_id: str) -> bool:
+    """
+    Validate session ID to prevent path traversal attacks.
+    
+    Args:
+        session_id: The session ID to validate
+        
+    Returns:
+        True if valid, False otherwise
+    """
+    if not session_id:
+        return False
+    if len(session_id) > MAX_SESSION_ID_LENGTH:
+        return False
+    if not VALID_SESSION_ID_PATTERN.match(session_id):
+        return False
+    # Extra check for path traversal attempts
+    if '..' in session_id or '/' in session_id or '\\' in session_id:
+        return False
+    return True
+
+
+def _validate_file_path(file_path: str) -> bool:
+    """
+    Validate file path to prevent path traversal attacks.
+    
+    Args:
+        file_path: The file path to validate
+        
+    Returns:
+        True if valid, False otherwise
+    """
+    if not file_path:
+        return False
+    if len(file_path) > MAX_FILE_PATH_LENGTH:
+        return False
+    # Check for null bytes (can be used to bypass checks)
+    if '\x00' in file_path:
+        return False
+    # Normalize and check for traversal
+    normalized = os.path.normpath(file_path)
+    if normalized.startswith('..') or normalized.startswith('/') or normalized.startswith('\\'):
+        return False
+    # Check for absolute paths on Windows
+    if len(normalized) > 1 and normalized[1] == ':':
+        return False
+    return True
+
+
+def _safe_resolve_path(base_path: Path, relative_path: str) -> Optional[Path]:
+    """
+    Safely resolve a path within a base directory, preventing path traversal.
+    
+    Args:
+        base_path: The base directory path
+        relative_path: The relative path to resolve
+        
+    Returns:
+        Resolved Path if safe, None if path traversal detected
+    """
+    try:
+        # Resolve base path first
+        base_resolved = base_path.resolve()
+        # Join and resolve the full path
+        full_path = (base_path / relative_path).resolve()
+        # Check if the resolved path is within the base directory
+        if not str(full_path).startswith(str(base_resolved) + os.sep) and full_path != base_resolved:
+            return None
+        return full_path
+    except (ValueError, OSError):
+        return None
+
 
 class GitService:
     """Service for handling Git operations."""
 
     @staticmethod
-    def _get_repo_path(session_id: str) -> Path:
-        """Get the path for a session's repository."""
+    def _get_repo_path(session_id: str) -> Optional[Path]:
+        """
+        Get the path for a session's repository with validation.
+        
+        Args:
+            session_id: The session identifier
+            
+        Returns:
+            Path if valid, None if validation fails
+        """
+        if not _validate_session_id(session_id):
+            return None
         return REPOS_BASE_PATH / session_id
 
     @staticmethod
@@ -42,6 +133,12 @@ class GitService:
             Dict with configuration status
         """
         repo_path = GitService._get_repo_path(session_id)
+        
+        if repo_path is None:
+            return {
+                "success": False,
+                "error": "Invalid session ID"
+            }
         
         try:
             if not global_config and not repo_path.exists():
@@ -97,6 +194,12 @@ class GitService:
             Dict with configuration status
         """
         repo_path = GitService._get_repo_path(session_id)
+        
+        if repo_path is None:
+            return {
+                "success": False,
+                "error": "Invalid session ID"
+            }
         
         try:
             if not repo_path.exists():
@@ -155,6 +258,12 @@ class GitService:
             Dict with user configuration
         """
         repo_path = GitService._get_repo_path(session_id)
+        
+        if repo_path is None:
+            return {
+                "success": False,
+                "error": "Invalid session ID"
+            }
         
         try:
             # Always try global config first
@@ -304,6 +413,12 @@ class GitService:
         """
         repo_path = GitService._get_repo_path(session_id)
         
+        if repo_path is None:
+            return {
+                "success": False,
+                "error": "Invalid session ID"
+            }
+        
         try:
             # Remove existing repo if it exists
             if repo_path.exists():
@@ -347,6 +462,12 @@ class GitService:
             Dict with repository status
         """
         repo_path = GitService._get_repo_path(session_id)
+        
+        if repo_path is None:
+            return {
+                "success": False,
+                "error": "Invalid session ID"
+            }
         
         try:
             if not repo_path.exists():
@@ -401,6 +522,12 @@ class GitService:
         """
         repo_path = GitService._get_repo_path(session_id)
         
+        if repo_path is None:
+            return {
+                "success": False,
+                "error": "Invalid session ID"
+            }
+        
         try:
             if not repo_path.exists():
                 return {
@@ -410,9 +537,25 @@ class GitService:
             
             repo = Repo(repo_path)
             
-            # Stage files
+            # Stage files - validate file paths if specific files provided
             if files:
-                repo.index.add(files)
+                validated_files = []
+                for f in files:
+                    if _validate_file_path(f):
+                        safe_path = _safe_resolve_path(repo_path, f)
+                        if safe_path is not None:
+                            validated_files.append(f)
+                        else:
+                            return {
+                                "success": False,
+                                "error": f"Invalid file path: {f}"
+                            }
+                    else:
+                        return {
+                            "success": False,
+                            "error": f"Invalid file path: {f}"
+                        }
+                repo.index.add(validated_files)
             else:
                 repo.git.add(A=True)  # Add all files
             
@@ -454,6 +597,12 @@ class GitService:
             Dict with push status
         """
         repo_path = GitService._get_repo_path(session_id)
+        
+        if repo_path is None:
+            return {
+                "success": False,
+                "error": "Invalid session ID"
+            }
         
         try:
             if not repo_path.exists():
@@ -526,6 +675,12 @@ class GitService:
         """
         repo_path = GitService._get_repo_path(session_id)
         
+        if repo_path is None:
+            return {
+                "success": False,
+                "error": "Invalid session ID"
+            }
+        
         try:
             if not repo_path.exists():
                 return {
@@ -567,6 +722,12 @@ class GitService:
             Dict with branch list
         """
         repo_path = GitService._get_repo_path(session_id)
+        
+        if repo_path is None:
+            return {
+                "success": False,
+                "error": "Invalid session ID"
+            }
         
         try:
             if not repo_path.exists():
@@ -611,6 +772,12 @@ class GitService:
         """
         repo_path = GitService._get_repo_path(session_id)
         
+        if repo_path is None:
+            return {
+                "success": False,
+                "error": "Invalid session ID"
+            }
+        
         try:
             if not repo_path.exists():
                 return {
@@ -653,6 +820,12 @@ class GitService:
         """
         repo_path = GitService._get_repo_path(session_id)
         
+        if repo_path is None:
+            return {
+                "success": False,
+                "error": "Invalid session ID"
+            }
+        
         try:
             if not repo_path.exists():
                 return {
@@ -687,6 +860,12 @@ class GitService:
             Dict with file tree structure
         """
         repo_path = GitService._get_repo_path(session_id)
+        
+        if repo_path is None:
+            return {
+                "success": False,
+                "error": "Invalid session ID"
+            }
         
         try:
             if not repo_path.exists():
@@ -752,12 +931,25 @@ class GitService:
             Dict with file content
         """
         repo_path = GitService._get_repo_path(session_id)
-        full_path = repo_path / file_path
+        
+        if repo_path is None:
+            return {
+                "success": False,
+                "error": "Invalid session ID"
+            }
+        
+        # Validate file path
+        if not _validate_file_path(file_path):
+            return {
+                "success": False,
+                "error": "Invalid file path"
+            }
         
         try:
-            # Security check: ensure file is within repo
-            full_path = full_path.resolve()
-            if not str(full_path).startswith(str(repo_path.resolve())):
+            # Safely resolve path
+            full_path = _safe_resolve_path(repo_path, file_path)
+            
+            if full_path is None:
                 return {
                     "success": False,
                     "error": "Access denied: file outside repository"
@@ -810,12 +1002,25 @@ class GitService:
             Dict with write status
         """
         repo_path = GitService._get_repo_path(session_id)
-        full_path = repo_path / file_path
+        
+        if repo_path is None:
+            return {
+                "success": False,
+                "error": "Invalid session ID"
+            }
+        
+        # Validate file path
+        if not _validate_file_path(file_path):
+            return {
+                "success": False,
+                "error": "Invalid file path"
+            }
         
         try:
-            # Security check: ensure file is within repo
-            full_path = full_path.resolve()
-            if not str(full_path).startswith(str(repo_path.resolve())):
+            # Safely resolve path
+            full_path = _safe_resolve_path(repo_path, file_path)
+            
+            if full_path is None:
                 return {
                     "success": False,
                     "error": "Access denied: file outside repository"
@@ -859,6 +1064,12 @@ class GitService:
         """
         repo_path = GitService._get_repo_path(session_id)
         
+        if repo_path is None:
+            return {
+                "success": False,
+                "error": "Invalid session ID"
+            }
+        
         try:
             if not repo_path.exists():
                 return {
@@ -900,6 +1111,12 @@ class GitService:
         """
         repo_path = GitService._get_repo_path(session_id)
         
+        if repo_path is None:
+            return {
+                "success": False,
+                "error": "Invalid session ID"
+            }
+        
         try:
             if not repo_path.exists():
                 return {
@@ -940,6 +1157,12 @@ class GitService:
         """
         repo_path = GitService._get_repo_path(session_id)
         
+        if repo_path is None:
+            return {
+                "success": False,
+                "error": "Invalid session ID"
+            }
+        
         try:
             if not repo_path.exists():
                 return {
@@ -974,6 +1197,12 @@ class GitService:
             Dict with pop status
         """
         repo_path = GitService._get_repo_path(session_id)
+        
+        if repo_path is None:
+            return {
+                "success": False,
+                "error": "Invalid session ID"
+            }
         
         try:
             if not repo_path.exists():
@@ -1014,6 +1243,12 @@ class GitService:
             Dict with commit history
         """
         repo_path = GitService._get_repo_path(session_id)
+        
+        if repo_path is None:
+            return {
+                "success": False,
+                "error": "Invalid session ID"
+            }
         
         try:
             if not repo_path.exists():
@@ -1069,6 +1304,19 @@ class GitService:
         """
         repo_path = GitService._get_repo_path(session_id)
         
+        if repo_path is None:
+            return {
+                "success": False,
+                "error": "Invalid session ID"
+            }
+        
+        # Validate file path if provided
+        if file_path and not _validate_file_path(file_path):
+            return {
+                "success": False,
+                "error": "Invalid file path"
+            }
+        
         try:
             if not repo_path.exists():
                 return {
@@ -1117,6 +1365,12 @@ class GitService:
             Dict with merge status
         """
         repo_path = GitService._get_repo_path(session_id)
+        
+        if repo_path is None:
+            return {
+                "success": False,
+                "error": "Invalid session ID"
+            }
         
         try:
             if not repo_path.exists():
@@ -1174,6 +1428,12 @@ class GitService:
         """
         repo_path = GitService._get_repo_path(session_id)
         
+        if repo_path is None:
+            return {
+                "success": False,
+                "error": "Invalid session ID"
+            }
+        
         try:
             if not repo_path.exists():
                 return {
@@ -1224,6 +1484,12 @@ class GitService:
         """
         repo_path = GitService._get_repo_path(session_id)
         
+        if repo_path is None:
+            return {
+                "success": False,
+                "error": "Invalid session ID"
+            }
+        
         try:
             if not repo_path.exists():
                 return {
@@ -1265,6 +1531,12 @@ class GitService:
             Dict with tag list
         """
         repo_path = GitService._get_repo_path(session_id)
+        
+        if repo_path is None:
+            return {
+                "success": False,
+                "error": "Invalid session ID"
+            }
         
         try:
             if not repo_path.exists():
