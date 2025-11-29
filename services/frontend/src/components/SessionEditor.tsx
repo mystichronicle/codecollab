@@ -2,6 +2,10 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Editor from '@monaco-editor/react';
 import { sessionsAPI, Session } from '../services/api';
+import SessionChat from './SessionChat';
+import CodeTemplates from './CodeTemplates';
+import { validateCode, ValidationResult } from '../utils/syntaxValidator';
+import { LanguageIcon, languageConfig } from './LanguageIcons';
 
 interface Participant {
   id: string;
@@ -27,19 +31,19 @@ const languageMap: Record<string, string> = {
 };
 
 const languageColors: Record<string, string> = {
-  plaintext: 'from-gray-500 to-gray-600',
-  text: 'from-gray-500 to-gray-600',
-  python: 'from-blue-500 to-blue-600',
-  javascript: 'from-yellow-500 to-yellow-600',
-  typescript: 'from-blue-400 to-blue-500',
-  go: 'from-cyan-500 to-cyan-600',
-  rust: 'from-orange-500 to-orange-600',
-  vlang: 'from-purple-500 to-purple-600',
-  zig: 'from-amber-500 to-amber-600',
-  elixir: 'from-purple-400 to-purple-500',
-  cpp: 'from-blue-600 to-blue-700',
-  c: 'from-gray-600 to-gray-700',
-  java: 'from-red-500 to-red-600',
+  plaintext: 'from-green-700 to-green-800',
+  text: 'from-green-700 to-green-800',
+  python: 'from-green-500 to-green-600',
+  javascript: 'from-green-400 to-green-500',
+  typescript: 'from-cyan-500 to-cyan-600',
+  go: 'from-green-500 to-cyan-600',
+  rust: 'from-green-600 to-green-700',
+  vlang: 'from-cyan-500 to-green-500',
+  zig: 'from-green-500 to-green-600',
+  elixir: 'from-cyan-400 to-cyan-500',
+  cpp: 'from-green-600 to-green-700',
+  c: 'from-green-700 to-green-800',
+  java: 'from-green-500 to-green-600',
 };
 
 export const SessionEditor: React.FC = () => {
@@ -56,6 +60,10 @@ export const SessionEditor: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [showOutput, setShowOutput] = useState(false);
   const [currentLanguage, setCurrentLanguage] = useState('plaintext');
+  const [showTemplates, setShowTemplates] = useState(false);
+  const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
+  const [validationResult, setValidationResult] = useState<ValidationResult | null>(null);
+  const [showValidationModal, setShowValidationModal] = useState(false);
   
   const socketRef = useRef<WebSocket | null>(null);
   const editorRef = useRef<any>(null);
@@ -86,6 +94,18 @@ export const SessionEditor: React.FC = () => {
   useEffect(() => {
     sessionIdRef.current = sessionId;
   }, [sessionId]);
+
+  // Close language dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const dropdown = document.getElementById('session-language-dropdown-container');
+      if (dropdown && !dropdown.contains(e.target as Node)) {
+        setShowLanguageDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Cleanup on unmount - save any pending changes
   useEffect(() => {
@@ -350,6 +370,30 @@ export const SessionEditor: React.FC = () => {
   const handleRunCode = async () => {
     if (!session) return;
     
+    // Validate code before execution
+    const validation = validateCode(code, currentLanguage);
+    
+    // If there are errors, show validation modal and don't execute
+    if (!validation.isValid || validation.errors.length > 0) {
+      setValidationResult(validation);
+      setShowValidationModal(true);
+      return;
+    }
+    
+    // If there are only warnings, show them but allow execution
+    if (validation.warnings.length > 0) {
+      setValidationResult(validation);
+      setShowValidationModal(true);
+      return;
+    }
+    
+    // No errors or warnings, proceed with execution
+    executeCode();
+  };
+
+  const executeCode = async () => {
+    if (!session) return;
+    
     setIsRunning(true);
     setShowOutput(true);
     setOutput('Running code...\n');
@@ -471,10 +515,10 @@ export const SessionEditor: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
+      <div className="min-h-screen flex items-center justify-center bg-black">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500 mx-auto"></div>
-          <p className="mt-4 text-gray-400 text-lg">Loading session...</p>
+          <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-green-500 mx-auto shadow-neon"></div>
+          <p className="mt-4 text-green-500 text-lg font-mono neon-glow">LOADING_SESSION_</p>
         </div>
       </div>
     );
@@ -482,11 +526,11 @@ export const SessionEditor: React.FC = () => {
 
   if (error || !session) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
-        <div className="text-center">
-          <div className="text-red-500 text-6xl mb-4">⚠️</div>
-          <h2 className="text-2xl font-bold text-white mb-2">Session Not Found</h2>
-          <p className="text-gray-400 mb-6">{error || 'The session you are looking for does not exist.'}</p>
+      <div className="min-h-screen flex items-center justify-center bg-black">
+        <div className="text-center border-2 border-red-500 p-8 bg-black">
+          <div className="text-red-500 text-6xl mb-4 font-mono">[ ! ]</div>
+          <h2 className="text-2xl font-bold text-red-500 mb-2 font-mono">SESSION_NOT_FOUND_</h2>
+          <p className="text-green-600 mb-6 font-mono">{error || '// the session you are looking for does not exist.'}</p>
           <button
             onClick={() => {
               // Clean up WebSocket before navigating
@@ -496,9 +540,9 @@ export const SessionEditor: React.FC = () => {
               }
               navigate('/dashboard');
             }}
-            className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+            className="px-6 py-3 bg-green-500 hover:bg-green-400 text-black font-mono font-bold transition-colors shadow-neon"
           >
-            Back to Dashboard
+            [ RETURN_TO_DASHBOARD ]
           </button>
         </div>
       </div>
@@ -506,14 +550,14 @@ export const SessionEditor: React.FC = () => {
   }
 
   return (
-    <div className="h-screen flex flex-col bg-gray-900">
+    <div className="h-screen flex flex-col bg-black">
       {/* Header */}
-      <header className="bg-gray-800/50 backdrop-blur-xl border-b border-gray-700/50">
+      <header className="bg-black/90 backdrop-blur-xl border-b-2 border-green-500/50 relative z-50">
         <div className="px-6 py-4 flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <button
               onClick={handleLeaveSession}
-              className="text-gray-400 hover:text-white transition-colors"
+              className="text-green-500 hover:text-green-400 transition-colors p-2 border border-transparent hover:border-green-500"
             >
               <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
@@ -521,52 +565,45 @@ export const SessionEditor: React.FC = () => {
             </button>
             
             <div className="flex items-center space-x-3">
-              <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${languageColors[currentLanguage] || 'from-gray-600 to-gray-700'} flex items-center justify-center`}>
-                <span className="text-2xl">
-                  {currentLanguage === 'plaintext' || currentLanguage === 'text' ? '📄' :
-                   currentLanguage === 'python' ? '🐍' : 
-                   currentLanguage === 'javascript' ? '📜' :
-                   currentLanguage === 'typescript' ? '🔷' :
-                   currentLanguage === 'go' ? '🐹' :
-                   currentLanguage === 'rust' ? '🦀' :
-                   currentLanguage === 'vlang' ? '⚡' :
-                   currentLanguage === 'zig' ? '⚡' :
-                   currentLanguage === 'elixir' ? '💧' :
-                   currentLanguage === 'cpp' ? '⚙️' :
-                   currentLanguage === 'c' ? '🔧' :
-                   currentLanguage === 'java' ? '☕' : '📝'}
+              <div className={`w-10 h-10 bg-gradient-to-br ${languageColors[currentLanguage] || 'from-green-600 to-green-700'} flex items-center justify-center border border-green-400/30`}>
+                <span className={`${languageConfig[currentLanguage]?.color || 'text-green-400'}`}>
+                  <LanguageIcon language={currentLanguage} className="w-6 h-6" />
                 </span>
               </div>
               <div>
-                <h1 className="text-xl font-bold text-white">{session.name}</h1>
+                <h1 className="text-xl font-bold text-green-400 font-mono neon-glow">{session.name}</h1>
                 <div className="flex items-center space-x-2">
-                  <svg className="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg className="w-4 h-4 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
                   </svg>
-                  <select
-                    value={currentLanguage}
-                    onChange={(e) => handleLanguageChange(e.target.value)}
-                    className="text-sm font-medium text-white bg-gray-800/80 backdrop-blur px-4 py-1.5 rounded-lg border border-gray-600/50 hover:border-blue-500/50 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all cursor-pointer shadow-lg"
-                  >
-                    <option value="plaintext">📄 Plain Text</option>
-                    <optgroup label="Popular Languages">
-                      <option value="python">🐍 Python</option>
-                      <option value="javascript">📜 JavaScript</option>
-                      <option value="typescript">🔷 TypeScript</option>
-                      <option value="java">☕ Java</option>
-                    </optgroup>
-                    <optgroup label="Systems Programming">
-                      <option value="c">🔧 C</option>
-                      <option value="cpp">⚙️ C++</option>
-                      <option value="rust">🦀 Rust</option>
-                      <option value="go">🐹 Go</option>
-                    </optgroup>
-                    <optgroup label="Modern Languages">
-                      <option value="vlang">⚡ V Lang</option>
-                      <option value="zig">⚡ Zig</option>
-                      <option value="elixir">💧 Elixir</option>
-                    </optgroup>
-                  </select>
+                  <div className="relative" id="session-language-dropdown-container">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setShowLanguageDropdown(!showLanguageDropdown); }}
+                      className="text-sm font-mono font-medium text-green-400 bg-black px-4 py-1.5 border border-green-500/50 hover:border-green-400 focus:outline-none transition-all cursor-pointer flex items-center gap-2"
+                    >
+                      <LanguageIcon language={currentLanguage} className={`w-4 h-4 ${languageConfig[currentLanguage]?.color || 'text-green-400'}`} />
+                      <span>{currentLanguage === 'plaintext' ? 'Plain Text' : currentLanguage.charAt(0).toUpperCase() + currentLanguage.slice(1)}</span>
+                      <svg className={`w-4 h-4 transition-transform ${showLanguageDropdown ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7"/>
+                      </svg>
+                    </button>
+                    {showLanguageDropdown && (
+                      <div className="absolute top-full left-0 mt-1 bg-black border border-green-500 shadow-lg shadow-green-500/20 min-w-[220px] max-h-80 overflow-y-auto z-[9999]">
+                        <div className="py-1">
+                          {['plaintext', 'python', 'javascript', 'typescript', 'java', 'c', 'cpp', 'rust', 'go', 'vlang', 'zig', 'elixir'].map((lang) => (
+                            <button
+                              key={lang}
+                              onClick={() => { handleLanguageChange(lang); setShowLanguageDropdown(false); }}
+                              className={`w-full px-4 py-2 text-left flex items-center gap-2 font-mono text-sm hover:bg-green-500/20 transition-colors ${currentLanguage === lang ? 'bg-green-500/20 text-green-400' : 'text-green-500'}`}
+                            >
+                              <LanguageIcon language={lang} className={`w-4 h-4 ${languageConfig[lang]?.color || 'text-green-400'}`} />
+                              <span>{lang === 'plaintext' ? 'Plain Text' : lang === 'cpp' ? 'C++' : lang === 'vlang' ? 'V Lang' : lang.charAt(0).toUpperCase() + lang.slice(1)}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -574,10 +611,10 @@ export const SessionEditor: React.FC = () => {
 
           <div className="flex items-center space-x-4">
             {/* Share Code */}
-            <div className="bg-gray-700/50 px-4 py-2 rounded-lg border border-gray-600/50">
+            <div className="bg-black px-4 py-2 border border-green-500/50">
               <div className="flex items-center space-x-2">
-                <span className="text-gray-400 text-sm">Share Code:</span>
-                <code className="text-green-400 font-mono text-lg font-bold tracking-wider">
+                <span className="text-green-600 text-sm font-mono">SHARE_CODE:</span>
+                <code className="text-green-400 font-mono text-lg font-bold tracking-wider neon-glow">
                   {session.share_code || 'N/A'}
                 </code>
                 <button
@@ -585,7 +622,7 @@ export const SessionEditor: React.FC = () => {
                     navigator.clipboard.writeText(session.share_code || '');
                     alert('Share code copied to clipboard!');
                   }}
-                  className="text-gray-400 hover:text-white transition-colors p-1"
+                  className="text-green-500 hover:text-green-400 transition-colors p-1 border border-transparent hover:border-green-500"
                   title="Copy share code"
                 >
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -603,7 +640,7 @@ export const SessionEditor: React.FC = () => {
                   {participants.slice(0, 5).map((participant) => (
                     <div
                       key={participant.id}
-                      className="w-8 h-8 rounded-full border-2 border-gray-800 flex items-center justify-center text-white text-sm font-bold"
+                      className="w-8 h-8 border-2 border-purple-500 flex items-center justify-center text-black text-sm font-bold font-mono"
                       style={{ backgroundColor: participant.color }}
                       title={`${participant.username} (online)`}
                     >
@@ -611,18 +648,18 @@ export const SessionEditor: React.FC = () => {
                     </div>
                   ))}
                   {participants.length > 5 && (
-                    <div className="w-8 h-8 rounded-full border-2 border-gray-800 bg-gray-700 flex items-center justify-center text-white text-xs font-bold">
+                    <div className="w-8 h-8 border-2 border-purple-500 bg-black flex items-center justify-center text-purple-400 text-xs font-bold font-mono">
                       +{participants.length - 5}
                     </div>
                   )}
                 </div>
                 <div className="text-sm">
-                  <div className="flex items-center text-green-400">
-                    <div className="w-2 h-2 bg-green-400 rounded-full mr-1.5 animate-pulse"></div>
+                  <div className="flex items-center text-purple-400 font-mono">
+                    <div className="w-2 h-2 bg-purple-500 rounded-full mr-1.5 animate-pulse shadow-[0_0_5px_rgba(168,85,247,0.5)]"></div>
                     <span className="font-semibold">{participants.length} online</span>
                   </div>
                   {session && session.participants && (
-                    <div className="text-gray-500 text-xs">
+                    <div className="text-purple-700 text-xs font-mono">
                       {session.participants.length} total member{session.participants.length !== 1 ? 's' : ''}
                     </div>
                   )}
@@ -632,16 +669,28 @@ export const SessionEditor: React.FC = () => {
 
             {/* Save Status */}
             {isSaving && (
-              <div className="flex items-center space-x-2 text-blue-400">
-                <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-blue-400"></div>
-                <span className="text-sm">Saving...</span>
+              <div className="flex items-center space-x-2 text-amber-400 font-mono">
+                <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-amber-400"></div>
+                <span className="text-sm">SAVING...</span>
               </div>
             )}
+
+            {/* Templates Button */}
+            <button
+              onClick={() => setShowTemplates(true)}
+              className="px-4 py-2 font-mono font-semibold transition-all flex items-center space-x-2 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-400 border border-cyan-500/50 hover:border-cyan-400 hover:shadow-[0_0_10px_rgba(34,211,238,0.3)]"
+              title="Browse code templates"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
+              </svg>
+              <span className="hidden sm:inline">Templates</span>
+            </button>
 
             {/* Export Button */}
             <button
               onClick={handleExport}
-              className="px-4 py-2 rounded-lg font-semibold transition-all flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-600/30"
+              className="px-4 py-2 font-mono font-semibold transition-all flex items-center space-x-2 bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 border border-amber-500/50 hover:border-amber-400 hover:shadow-[0_0_10px_rgba(251,191,36,0.3)]"
               title="Download code"
             >
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -655,23 +704,23 @@ export const SessionEditor: React.FC = () => {
               <button
                 onClick={handleRunCode}
                 disabled={isRunning}
-                className={`px-6 py-2 rounded-lg font-semibold transition-all flex items-center space-x-2 ${
+                className={`px-6 py-2 font-mono font-semibold transition-all flex items-center space-x-2 ${
                   isRunning
-                    ? 'bg-gray-700 text-gray-400 cursor-not-allowed'
-                    : 'bg-green-600 hover:bg-green-700 text-white shadow-lg shadow-green-600/30'
+                    ? 'bg-black text-green-700 cursor-not-allowed border border-green-700'
+                    : 'bg-green-500 hover:bg-green-400 text-black shadow-neon'
                 }`}
               >
                 {isRunning ? (
                   <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-white"></div>
-                    <span>Running</span>
+                    <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-green-400"></div>
+                    <span>RUNNING...</span>
                   </>
                 ) : (
                   <>
                     <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                       <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
                     </svg>
-                    <span>Run</span>
+                    <span>[ RUN ]</span>
                   </>
                 )}
               </button>
@@ -708,37 +757,150 @@ export const SessionEditor: React.FC = () => {
 
         {/* Output Panel */}
         {showOutput && (
-          <div className="w-1/3 border-l border-gray-700 bg-gray-900 flex flex-col">
-            <div className="bg-gray-800 border-b border-gray-700 px-4 py-3 flex items-center justify-between">
+          <div className="w-1/3 border-l-2 border-green-500/50 bg-black flex flex-col">
+            <div className="bg-black border-b border-green-500/30 px-4 py-3 flex items-center justify-between">
               <div className="flex items-center space-x-2">
-                <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="w-5 h-5 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
-                <span className="text-sm font-semibold text-white">Output</span>
+                <span className="text-sm font-semibold text-green-400 font-mono">OUTPUT_</span>
                 {isRunning && (
-                  <div className="flex items-center space-x-2 text-blue-400">
-                    <div className="animate-spin rounded-full h-3 w-3 border-t-2 border-blue-400"></div>
-                    <span className="text-xs">Running...</span>
+                  <div className="flex items-center space-x-2 text-green-400">
+                    <div className="animate-spin rounded-full h-3 w-3 border-t-2 border-green-400"></div>
+                    <span className="text-xs font-mono">RUNNING...</span>
                   </div>
                 )}
               </div>
               <button
                 onClick={() => setShowOutput(false)}
-                className="text-gray-400 hover:text-white transition-colors p-1"
+                className="text-green-500 hover:text-red-500 transition-colors p-1"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
             </div>
-            <div className="flex-1 overflow-auto p-4">
-              <pre className="text-sm text-gray-300 font-mono whitespace-pre-wrap">
-                {output || 'Click "Run Code" to see output here'}
+            <div className="flex-1 overflow-auto p-4 bg-black">
+              <pre className="text-sm text-green-400 font-mono whitespace-pre-wrap">
+                {output || '// click "RUN" to see output here'}
               </pre>
             </div>
           </div>
         )}
       </div>
+
+      {/* Session Chat */}
+      {session && socketRef.current && participants.length > 0 && (
+        <SessionChat
+          sessionId={sessionId!}
+          currentUser={{
+            id: participants[0].id,
+            username: participants[0].username
+          }}
+          ws={socketRef.current}
+        />
+      )}
+
+      {/* Code Templates */}
+      {showTemplates && (
+        <CodeTemplates
+          onSelectTemplate={(templateCode, language) => {
+            setCode(templateCode);
+            setCurrentLanguage(language);
+            setShowTemplates(false);
+          }}
+        />
+      )}
+
+      {/* Validation Modal */}
+      {showValidationModal && validationResult && (
+        <div className="fixed inset-0 bg-black/95 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-black border-2 border-green-500 max-w-2xl w-full mx-4 max-h-[80vh] flex flex-col">
+            <div className="px-6 py-4 border-b border-green-500/30 flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                {validationResult.errors.length > 0 ? (
+                  <>
+                    <svg className="w-6 h-6 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <h3 className="text-lg font-semibold text-red-500 font-mono">SYNTAX_ERRORS_DETECTED_</h3>
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-6 h-6 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    <h3 className="text-lg font-semibold text-yellow-500 font-mono">WARNINGS_</h3>
+                  </>
+                )}
+              </div>
+              <button
+                onClick={() => {
+                  setShowValidationModal(false);
+                  setValidationResult(null);
+                }}
+                className="text-green-500 hover:text-red-500 transition-colors"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            <div className="flex-1 overflow-auto px-6 py-4">
+              {validationResult.errors.length > 0 && (
+                <div className="mb-4">
+                  <h4 className="text-sm font-semibold text-red-400 mb-2 font-mono">// errors:</h4>
+                  <ul className="space-y-2">
+                    {validationResult.errors.map((error, idx) => (
+                      <li key={idx} className="text-sm text-red-400 bg-red-500/10 px-3 py-2 border border-red-500/50 font-mono">
+                        {error}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              
+              {validationResult.warnings.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-semibold text-yellow-400 mb-2 font-mono">// warnings:</h4>
+                  <ul className="space-y-2">
+                    {validationResult.warnings.map((warning, idx) => (
+                      <li key={idx} className="text-sm text-yellow-400 bg-yellow-500/10 px-3 py-2 border border-yellow-500/50 font-mono">
+                        {warning}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+            
+            <div className="px-6 py-4 border-t border-green-500/30 flex justify-end space-x-3">
+              <button
+                onClick={() => {
+                  setShowValidationModal(false);
+                  setValidationResult(null);
+                }}
+                className="px-4 py-2 bg-black hover:bg-green-500/10 text-green-400 border border-green-500/50 hover:border-green-400 transition-colors font-mono"
+              >
+                [ CANCEL ]
+              </button>
+              {validationResult.errors.length === 0 && (
+                <button
+                  onClick={() => {
+                    setShowValidationModal(false);
+                    setValidationResult(null);
+                    executeCode();
+                  }}
+                  className="px-4 py-2 bg-green-500 hover:bg-green-400 text-black transition-colors font-mono font-bold shadow-neon"
+                >
+                  [ RUN_ANYWAY ]
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

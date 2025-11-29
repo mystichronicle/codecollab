@@ -23,6 +23,212 @@ class GitService:
         return REPOS_BASE_PATH / session_id
 
     @staticmethod
+    def configure_user(
+        session_id: str,
+        name: str,
+        email: str,
+        global_config: bool = False
+    ) -> Dict[str, any]:
+        """
+        Configure Git user information.
+        
+        Args:
+            session_id: Unique session identifier
+            name: User's full name
+            email: User's email address
+            global_config: If True, configure globally; otherwise, per-repo
+            
+        Returns:
+            Dict with configuration status
+        """
+        repo_path = GitService._get_repo_path(session_id)
+        
+        try:
+            if not global_config and not repo_path.exists():
+                return {
+                    "success": False,
+                    "error": "No repository found for this session"
+                }
+            
+            if global_config:
+                # Configure globally
+                import subprocess
+                subprocess.run(["git", "config", "--global", "user.name", name], check=True)
+                subprocess.run(["git", "config", "--global", "user.email", email], check=True)
+                scope = "global"
+            else:
+                # Configure for this repo only
+                repo = Repo(repo_path)
+                with repo.config_writer() as git_config:
+                    git_config.set_value("user", "name", name)
+                    git_config.set_value("user", "email", email)
+                scope = "repository"
+            
+            return {
+                "success": True,
+                "message": f"Git user configured ({scope})",
+                "name": name,
+                "email": email,
+                "scope": scope
+            }
+        except Exception as e:
+            logger.error(f"Error configuring Git user: {e}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
+
+    @staticmethod
+    def configure_credentials(
+        session_id: str,
+        github_token: str,
+        github_username: str
+    ) -> Dict[str, any]:
+        """
+        Configure Git credentials for authenticated operations.
+        Sets up credential helper to use provided GitHub token.
+        
+        Args:
+            session_id: Unique session identifier
+            github_token: GitHub Personal Access Token
+            github_username: GitHub username
+            
+        Returns:
+            Dict with configuration status
+        """
+        repo_path = GitService._get_repo_path(session_id)
+        
+        try:
+            if not repo_path.exists():
+                return {
+                    "success": False,
+                    "error": "No repository found for this session"
+                }
+            
+            repo = Repo(repo_path)
+            
+            # Update remote URL to include credentials
+            if repo.remotes:
+                remote = repo.remotes.origin
+                old_url = remote.url
+                
+                # Parse the URL and add credentials
+                if old_url.startswith('https://github.com/'):
+                    # Replace with authenticated URL
+                    repo_path_part = old_url.replace('https://github.com/', '')
+                    new_url = f'https://{github_username}:{github_token}@github.com/{repo_path_part}'
+                    remote.set_url(new_url)
+                    
+                    return {
+                        "success": True,
+                        "message": "Git credentials configured successfully",
+                        "note": "You can now push and pull from private repositories"
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "error": "Only HTTPS GitHub URLs are supported for credential configuration",
+                        "current_url": old_url
+                    }
+            else:
+                return {
+                    "success": False,
+                    "error": "No remote repository configured"
+                }
+                
+        except Exception as e:
+            logger.error(f"Error configuring credentials: {e}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
+
+    @staticmethod
+    def get_user_config(session_id: str) -> Dict[str, any]:
+        """
+        Get Git user configuration.
+        
+        Args:
+            session_id: Unique session identifier
+            
+        Returns:
+            Dict with user configuration
+        """
+        repo_path = GitService._get_repo_path(session_id)
+        
+        try:
+            # Always try global config first
+            import subprocess
+            try:
+                name = subprocess.run(
+                    ["git", "config", "--global", "user.name"],
+                    capture_output=True, text=True, check=True
+                ).stdout.strip()
+                email = subprocess.run(
+                    ["git", "config", "--global", "user.email"],
+                    capture_output=True, text=True, check=True
+                ).stdout.strip()
+                
+                if name and email:
+                    return {
+                        "success": True,
+                        "name": name,
+                        "email": email,
+                        "scope": "global"
+                    }
+            except subprocess.CalledProcessError:
+                pass
+            
+            # If no global config and no repo exists, return not configured
+            if not repo_path.exists():
+                return {
+                    "success": False,
+                    "error": "Git user not configured",
+                    "message": "No global Git config found. Please configure your Git user."
+                }
+            
+            repo = Repo(repo_path)
+            with repo.config_reader() as git_config:
+                try:
+                    name = git_config.get_value("user", "name")
+                    email = git_config.get_value("user", "email")
+                    return {
+                        "success": True,
+                        "name": name,
+                        "email": email,
+                        "scope": "repository"
+                    }
+                except Exception:
+                    # Fall back to global config
+                    import subprocess
+                    try:
+                        name = subprocess.run(
+                            ["git", "config", "--global", "user.name"],
+                            capture_output=True, text=True, check=True
+                        ).stdout.strip()
+                        email = subprocess.run(
+                            ["git", "config", "--global", "user.email"],
+                            capture_output=True, text=True, check=True
+                        ).stdout.strip()
+                        return {
+                            "success": True,
+                            "name": name,
+                            "email": email,
+                            "scope": "global"
+                        }
+                    except subprocess.CalledProcessError:
+                        return {
+                            "success": False,
+                            "error": "Git user not configured"
+                        }
+        except Exception as e:
+            logger.error(f"Error getting Git user config: {e}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
+
+    @staticmethod
     def list_workspaces() -> Dict[str, any]:
         """
         List all Git workspaces (cloned repositories).
@@ -273,6 +479,28 @@ class GitService:
             }
         except Exception as e:
             logger.error(f"Error pushing changes: {e}")
+            error_str = str(e)
+            
+            # Provide helpful error messages for common authentication issues
+            if "could not read Username" in error_str or "could not read Password" in error_str:
+                return {
+                    "success": False,
+                    "error": "Authentication required",
+                    "message": "Push failed: Git credentials not configured. For HTTPS URLs, you need to use a Personal Access Token (PAT). Consider using SSH URLs instead, or configure Git credentials."
+                }
+            elif "Authentication failed" in error_str or "403" in error_str:
+                return {
+                    "success": False,
+                    "error": "Authentication failed",
+                    "message": "Push failed: Invalid credentials or insufficient permissions. Please check your access token or SSH keys."
+                }
+            elif "Permission denied" in error_str:
+                return {
+                    "success": False,
+                    "error": "Permission denied",
+                    "message": "Push failed: You don't have permission to push to this repository. Check your repository access rights."
+                }
+            
             return {
                 "success": False,
                 "error": str(e),
@@ -607,6 +835,454 @@ class GitService:
             }
         except Exception as e:
             logger.error(f"Error writing file: {e}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
+
+    @staticmethod
+    def stash_changes(
+        session_id: str,
+        message: Optional[str] = None,
+        include_untracked: bool = False
+    ) -> Dict[str, any]:
+        """
+        Stash current changes.
+        
+        Args:
+            session_id: Unique session identifier
+            message: Optional stash message
+            include_untracked: Whether to include untracked files
+            
+        Returns:
+            Dict with stash status
+        """
+        repo_path = GitService._get_repo_path(session_id)
+        
+        try:
+            if not repo_path.exists():
+                return {
+                    "success": False,
+                    "error": "No repository found for this session"
+                }
+            
+            repo = Repo(repo_path)
+            
+            args = []
+            if include_untracked:
+                args.append("-u")
+            if message:
+                args.extend(["save", message])
+            
+            repo.git.stash(*args)
+            
+            return {
+                "success": True,
+                "message": "Changes stashed successfully"
+            }
+        except Exception as e:
+            logger.error(f"Error stashing changes: {e}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
+
+    @staticmethod
+    def list_stashes(session_id: str) -> Dict[str, any]:
+        """
+        List all stashes.
+        
+        Args:
+            session_id: Unique session identifier
+            
+        Returns:
+            Dict with stash list
+        """
+        repo_path = GitService._get_repo_path(session_id)
+        
+        try:
+            if not repo_path.exists():
+                return {
+                    "success": False,
+                    "error": "No repository found for this session"
+                }
+            
+            repo = Repo(repo_path)
+            stash_list = repo.git.stash("list").split("\n") if repo.git.stash("list") else []
+            
+            stashes = []
+            for stash in stash_list:
+                if stash:
+                    stashes.append(stash)
+            
+            return {
+                "success": True,
+                "stashes": stashes
+            }
+        except Exception as e:
+            logger.error(f"Error listing stashes: {e}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
+
+    @staticmethod
+    def apply_stash(session_id: str, stash_index: int = 0) -> Dict[str, any]:
+        """
+        Apply a stash.
+        
+        Args:
+            session_id: Unique session identifier
+            stash_index: Index of stash to apply (default: 0 = most recent)
+            
+        Returns:
+            Dict with apply status
+        """
+        repo_path = GitService._get_repo_path(session_id)
+        
+        try:
+            if not repo_path.exists():
+                return {
+                    "success": False,
+                    "error": "No repository found for this session"
+                }
+            
+            repo = Repo(repo_path)
+            repo.git.stash("apply", f"stash@{{{stash_index}}}")
+            
+            return {
+                "success": True,
+                "message": f"Stash {stash_index} applied successfully"
+            }
+        except Exception as e:
+            logger.error(f"Error applying stash: {e}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
+
+    @staticmethod
+    def pop_stash(session_id: str, stash_index: int = 0) -> Dict[str, any]:
+        """
+        Pop (apply and remove) a stash.
+        
+        Args:
+            session_id: Unique session identifier
+            stash_index: Index of stash to pop (default: 0 = most recent)
+            
+        Returns:
+            Dict with pop status
+        """
+        repo_path = GitService._get_repo_path(session_id)
+        
+        try:
+            if not repo_path.exists():
+                return {
+                    "success": False,
+                    "error": "No repository found for this session"
+                }
+            
+            repo = Repo(repo_path)
+            repo.git.stash("pop", f"stash@{{{stash_index}}}")
+            
+            return {
+                "success": True,
+                "message": f"Stash {stash_index} popped successfully"
+            }
+        except Exception as e:
+            logger.error(f"Error popping stash: {e}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
+
+    @staticmethod
+    def get_commit_log(
+        session_id: str,
+        max_count: int = 50,
+        branch: Optional[str] = None
+    ) -> Dict[str, any]:
+        """
+        Get commit history.
+        
+        Args:
+            session_id: Unique session identifier
+            max_count: Maximum number of commits to retrieve
+            branch: Optional branch name (default: current branch)
+            
+        Returns:
+            Dict with commit history
+        """
+        repo_path = GitService._get_repo_path(session_id)
+        
+        try:
+            if not repo_path.exists():
+                return {
+                    "success": False,
+                    "error": "No repository found for this session"
+                }
+            
+            repo = Repo(repo_path)
+            
+            commits = []
+            for commit in repo.iter_commits(branch, max_count=max_count):
+                commits.append({
+                    "hash": commit.hexsha,
+                    "short_hash": commit.hexsha[:7],
+                    "author": str(commit.author),
+                    "email": commit.author.email,
+                    "message": commit.message.strip(),
+                    "date": commit.committed_datetime.isoformat(),
+                    "parent_count": len(commit.parents)
+                })
+            
+            return {
+                "success": True,
+                "commits": commits,
+                "count": len(commits)
+            }
+        except Exception as e:
+            logger.error(f"Error getting commit log: {e}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
+
+    @staticmethod
+    def get_diff(
+        session_id: str,
+        commit1: Optional[str] = None,
+        commit2: Optional[str] = None,
+        file_path: Optional[str] = None
+    ) -> Dict[str, any]:
+        """
+        Get diff between commits or working directory.
+        
+        Args:
+            session_id: Unique session identifier
+            commit1: First commit (default: HEAD)
+            commit2: Second commit (default: working directory)
+            file_path: Optional specific file path
+            
+        Returns:
+            Dict with diff content
+        """
+        repo_path = GitService._get_repo_path(session_id)
+        
+        try:
+            if not repo_path.exists():
+                return {
+                    "success": False,
+                    "error": "No repository found for this session"
+                }
+            
+            repo = Repo(repo_path)
+            
+            args = []
+            if commit1:
+                args.append(commit1)
+            if commit2:
+                args.append(commit2)
+            if file_path:
+                args.extend(["--", file_path])
+            
+            diff_text = repo.git.diff(*args) if args else repo.git.diff()
+            
+            return {
+                "success": True,
+                "diff": diff_text
+            }
+        except Exception as e:
+            logger.error(f"Error getting diff: {e}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
+
+    @staticmethod
+    def merge_branch(
+        session_id: str,
+        branch_name: str,
+        commit_message: Optional[str] = None
+    ) -> Dict[str, any]:
+        """
+        Merge a branch into the current branch.
+        
+        Args:
+            session_id: Unique session identifier
+            branch_name: Branch to merge
+            commit_message: Optional merge commit message
+            
+        Returns:
+            Dict with merge status
+        """
+        repo_path = GitService._get_repo_path(session_id)
+        
+        try:
+            if not repo_path.exists():
+                return {
+                    "success": False,
+                    "error": "No repository found for this session"
+                }
+            
+            repo = Repo(repo_path)
+            current_branch = repo.active_branch.name
+            
+            # Perform merge
+            args = [branch_name]
+            if commit_message:
+                args.extend(["-m", commit_message])
+            
+            repo.git.merge(*args)
+            
+            return {
+                "success": True,
+                "message": f"Merged '{branch_name}' into '{current_branch}'",
+                "current_branch": current_branch,
+                "merged_branch": branch_name
+            }
+        except GitCommandError as e:
+            logger.error(f"Merge conflict or error: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "message": "Merge conflict detected. Please resolve conflicts manually."
+            }
+        except Exception as e:
+            logger.error(f"Error merging branch: {e}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
+
+    @staticmethod
+    def reset(
+        session_id: str,
+        mode: str = "mixed",
+        commit: str = "HEAD"
+    ) -> Dict[str, any]:
+        """
+        Reset current branch to a specific state.
+        
+        Args:
+            session_id: Unique session identifier
+            mode: Reset mode (soft, mixed, hard)
+            commit: Commit to reset to (default: HEAD)
+            
+        Returns:
+            Dict with reset status
+        """
+        repo_path = GitService._get_repo_path(session_id)
+        
+        try:
+            if not repo_path.exists():
+                return {
+                    "success": False,
+                    "error": "No repository found for this session"
+                }
+            
+            if mode not in ["soft", "mixed", "hard"]:
+                return {
+                    "success": False,
+                    "error": "Invalid reset mode. Use 'soft', 'mixed', or 'hard'"
+                }
+            
+            repo = Repo(repo_path)
+            repo.git.reset(f"--{mode}", commit)
+            
+            return {
+                "success": True,
+                "message": f"Reset to {commit} ({mode} mode)",
+                "mode": mode,
+                "commit": commit
+            }
+        except Exception as e:
+            logger.error(f"Error resetting: {e}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
+
+    @staticmethod
+    def create_tag(
+        session_id: str,
+        tag_name: str,
+        message: Optional[str] = None,
+        commit: str = "HEAD"
+    ) -> Dict[str, any]:
+        """
+        Create a new tag.
+        
+        Args:
+            session_id: Unique session identifier
+            tag_name: Name for the tag
+            message: Optional tag message (creates annotated tag)
+            commit: Commit to tag (default: HEAD)
+            
+        Returns:
+            Dict with tag creation status
+        """
+        repo_path = GitService._get_repo_path(session_id)
+        
+        try:
+            if not repo_path.exists():
+                return {
+                    "success": False,
+                    "error": "No repository found for this session"
+                }
+            
+            repo = Repo(repo_path)
+            
+            if message:
+                # Annotated tag
+                repo.create_tag(tag_name, ref=commit, message=message)
+            else:
+                # Lightweight tag
+                repo.create_tag(tag_name, ref=commit)
+            
+            return {
+                "success": True,
+                "message": f"Tag '{tag_name}' created successfully",
+                "tag": tag_name,
+                "commit": commit
+            }
+        except Exception as e:
+            logger.error(f"Error creating tag: {e}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
+
+    @staticmethod
+    def list_tags(session_id: str) -> Dict[str, any]:
+        """
+        List all tags.
+        
+        Args:
+            session_id: Unique session identifier
+            
+        Returns:
+            Dict with tag list
+        """
+        repo_path = GitService._get_repo_path(session_id)
+        
+        try:
+            if not repo_path.exists():
+                return {
+                    "success": False,
+                    "error": "No repository found for this session"
+                }
+            
+            repo = Repo(repo_path)
+            tags = [tag.name for tag in repo.tags]
+            
+            return {
+                "success": True,
+                "tags": tags,
+                "count": len(tags)
+            }
+        except Exception as e:
+            logger.error(f"Error listing tags: {e}")
             return {
                 "success": False,
                 "error": str(e)

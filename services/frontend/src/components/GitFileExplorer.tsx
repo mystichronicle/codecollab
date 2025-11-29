@@ -23,6 +23,7 @@ const GitFileExplorer: React.FC<GitFileExplorerProps> = ({ sessionId }) => {
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'tree' | 'editor'>('tree');
+  const [searchQuery, setSearchQuery] = useState<string>('');
 
   useEffect(() => {
     loadFileTree();
@@ -168,17 +169,17 @@ const GitFileExplorer: React.FC<GitFileExplorerProps> = ({ sessionId }) => {
     if (!status) return null;
 
     const badges = {
-      'M': { label: 'M', color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/40', tooltip: 'Modified' },
-      'A': { label: 'A', color: 'bg-green-500/20 text-green-400 border-green-500/40', tooltip: 'Added' },
+      'M': { label: 'M', color: 'bg-amber-500/20 text-amber-400 border-amber-500/40', tooltip: 'Modified' },
+      'A': { label: 'A', color: 'bg-orange-500/20 text-orange-400 border-orange-500/40', tooltip: 'Added' },
       'D': { label: 'D', color: 'bg-red-500/20 text-red-400 border-red-500/40', tooltip: 'Deleted' },
-      '??': { label: '??', color: 'bg-blue-500/20 text-blue-400 border-blue-500/40', tooltip: 'Untracked' },
-      'R': { label: 'R', color: 'bg-purple-500/20 text-purple-400 border-purple-500/40', tooltip: 'Renamed' },
+      '??': { label: '??', color: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/40', tooltip: 'Untracked' },
+      'R': { label: 'R', color: 'bg-orange-600/20 text-orange-300 border-orange-600/40', tooltip: 'Renamed' },
     };
 
     const badge = badges[status];
     return (
       <span
-        className={`px-2 py-0.5 rounded text-xs font-bold border ${badge.color}`}
+        className={`px-2 py-0.5 text-xs font-bold border ${badge.color}`}
         title={badge.tooltip}
       >
         {badge.label}
@@ -186,8 +187,31 @@ const GitFileExplorer: React.FC<GitFileExplorerProps> = ({ sessionId }) => {
     );
   };
 
+  const filterFileTree = (nodes: FileWithStatus[], query: string): FileWithStatus[] => {
+    if (!query.trim()) return nodes;
+    
+    const lowerQuery = query.toLowerCase();
+    
+    return nodes.reduce((filtered: FileWithStatus[], node) => {
+      if (node.type === 'directory' && node.children) {
+        const filteredChildren = filterFileTree(node.children, query);
+        if (filteredChildren.length > 0 || node.name.toLowerCase().includes(lowerQuery)) {
+          filtered.push({
+            ...node,
+            children: filteredChildren.length > 0 ? filteredChildren : node.children
+          });
+        }
+      } else if (node.name.toLowerCase().includes(lowerQuery)) {
+        filtered.push(node);
+      }
+      return filtered;
+    }, []);
+  };
+
   const renderFileTree = (nodes: FileWithStatus[], path: string = '', level: number = 0): React.ReactNode => {
-    return nodes.map((node, index) => {
+    const filteredNodes = searchQuery ? filterFileTree(nodes, searchQuery) : nodes;
+    
+    return filteredNodes.map((node, index) => {
       const fullPath = path ? `${path}/${node.name}` : node.name;
       const isExpanded = expandedDirs.has(fullPath);
       const isSelected = selectedFile === fullPath;
@@ -197,24 +221,24 @@ const GitFileExplorer: React.FC<GitFileExplorerProps> = ({ sessionId }) => {
           <div key={`${fullPath}-${index}`} className="animate-fadeIn">
             <div
               onClick={() => toggleDirectory(fullPath)}
-              className="flex items-center space-x-2 px-3 py-2 hover:bg-gray-800/50 rounded-lg cursor-pointer transition-all group"
+              className="flex items-center space-x-2 px-3 py-2 hover:bg-orange-500/10 cursor-pointer transition-all group border-l-2 border-transparent hover:border-orange-500"
               style={{ paddingLeft: `${level * 20 + 12}px` }}
             >
               <svg
-                className={`w-4 h-4 text-gray-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
+                className={`w-4 h-4 text-orange-500 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
               >
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>
-              <svg className="w-5 h-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="w-5 h-5 text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
               </svg>
-              <span className="text-gray-300 font-medium group-hover:text-white transition-colors">{node.name}</span>
+              <span className="text-orange-400 font-medium group-hover:text-orange-300 transition-colors font-mono">{node.name}</span>
             </div>
             {isExpanded && node.children && (
-              <div className="ml-2">
+              <div className="ml-2 border-l border-orange-500/20">
                 {renderFileTree(node.children, fullPath, level + 1)}
               </div>
             )}
@@ -226,23 +250,23 @@ const GitFileExplorer: React.FC<GitFileExplorerProps> = ({ sessionId }) => {
         <div
           key={`${fullPath}-${index}`}
           onClick={() => handleFileClick(fullPath)}
-          className={`flex items-center justify-between px-3 py-2 hover:bg-gray-800/70 rounded-lg cursor-pointer transition-all group ${
-            isSelected ? 'bg-purple-500/20 border-l-2 border-purple-500' : ''
+          className={`flex items-center justify-between px-3 py-2 hover:bg-orange-500/10 cursor-pointer transition-all group ${
+            isSelected ? 'bg-orange-500/20 border-l-2 border-orange-500' : 'border-l-2 border-transparent hover:border-orange-500/50'
           }`}
           style={{ paddingLeft: `${level * 20 + 32}px` }}
         >
           <div className="flex items-center space-x-2 flex-1">
-            <svg className="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="w-4 h-4 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
-            <span className={`text-sm ${isSelected ? 'text-white font-semibold' : 'text-gray-400 group-hover:text-gray-200'} transition-colors`}>
+            <span className={`text-sm font-mono ${isSelected ? 'text-orange-400 font-semibold' : 'text-orange-600 group-hover:text-orange-400'} transition-colors`}>
               {node.name}
             </span>
           </div>
           <div className="flex items-center space-x-2">
             {node.gitStatus && getStatusBadge(node.gitStatus)}
             {node.size && (
-              <span className="text-xs text-gray-600">{formatBytes(node.size)}</span>
+              <span className="text-xs text-orange-700 font-mono">{formatBytes(node.size)}</span>
             )}
           </div>
         </div>
@@ -263,23 +287,23 @@ const GitFileExplorer: React.FC<GitFileExplorerProps> = ({ sessionId }) => {
   };
 
   return (
-    <div className="flex flex-col bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl border border-gray-700/50 shadow-2xl overflow-hidden" style={{ height: '650px' }}>
+    <div className="flex flex-col bg-black border-2 border-dashed border-orange-500/30 font-mono overflow-hidden" style={{ height: '650px' }}>
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-gray-700/50 bg-gray-900/50 backdrop-blur">
+      <div className="flex items-center justify-between p-4 border-b border-dashed border-orange-500/30 bg-black">
         <div className="flex items-center space-x-3">
-          <div className="p-2 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl">
-            <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <div className="p-2 bg-black border-2 border-dashed border-orange-500 text-orange-500 rotate-3 hover:rotate-0 transition-transform">
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
             </svg>
           </div>
           <div>
-            <h3 className="text-lg font-bold text-white">File Explorer</h3>
+            <h3 className="text-lg font-bold text-orange-500"><span className="text-orange-600">//</span> FILE_EXPLORER</h3>
             {gitStatus && (
-              <p className="text-xs text-gray-400">
-                Branch: <span className="text-blue-400 font-semibold">{gitStatus.branch}</span>
+              <p className="text-xs text-orange-600">
+                BRANCH: <span className="text-orange-400 font-semibold">{gitStatus.branch}</span>
                 {gitStatus.is_dirty && (
-                  <span className="ml-2 px-2 py-0.5 bg-yellow-500/20 text-yellow-400 rounded text-xs">
-                    Uncommitted changes
+                  <span className="ml-2 px-2 py-0.5 bg-amber-500/20 text-amber-400 text-xs border border-dashed border-amber-500/40">
+                    UNCOMMITTED
                   </span>
                 )}
               </p>
@@ -289,7 +313,7 @@ const GitFileExplorer: React.FC<GitFileExplorerProps> = ({ sessionId }) => {
         <div className="flex items-center space-x-2">
           <button
             onClick={() => setViewMode(viewMode === 'tree' ? 'editor' : 'tree')}
-            className="p-2 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-lg transition-all"
+            className="p-2 text-orange-500 hover:text-orange-400 hover:bg-orange-500/10 border border-dashed border-orange-500/30 hover:border-orange-500 transition-all"
             title={viewMode === 'tree' ? 'Show editor view' : 'Show tree view'}
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -303,7 +327,7 @@ const GitFileExplorer: React.FC<GitFileExplorerProps> = ({ sessionId }) => {
           <button
             onClick={refresh}
             disabled={isLoading}
-            className="p-2 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-lg transition-all disabled:opacity-50"
+            className="p-2 text-orange-500 hover:text-orange-400 hover:bg-orange-500/10 border border-dashed border-orange-500/30 hover:border-orange-500 transition-all disabled:opacity-50"
             title="Refresh"
           >
             <svg className={`w-5 h-5 ${isLoading ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -313,14 +337,42 @@ const GitFileExplorer: React.FC<GitFileExplorerProps> = ({ sessionId }) => {
         </div>
       </div>
 
+      {/* Search Bar */}
+      {viewMode === 'tree' && (
+        <div className="px-4 pt-4">
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="$ grep -r 'filename'..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full px-4 py-2 pl-10 bg-black border border-orange-500/30 text-orange-400 placeholder-orange-700 focus:outline-none focus:border-orange-500 text-sm font-mono"
+            />
+            <svg className="w-5 h-5 text-orange-600 absolute left-3 top-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-3 top-2.5 text-orange-600 hover:text-orange-400"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Error Toast */}
       {error && (
-        <div className="mx-4 mt-4 p-3 bg-red-500/10 border border-red-500/50 rounded-lg text-red-400 text-sm animate-fadeIn">
+        <div className="mx-4 mt-4 p-3 bg-red-500/10 border border-red-500/50 text-red-400 text-sm animate-fadeIn font-mono">
           <div className="flex items-center space-x-2">
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            <span>{error}</span>
+            <span>[ERROR] {error}</span>
             <button onClick={() => setError(null)} className="ml-auto text-red-400 hover:text-red-300">
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -332,12 +384,12 @@ const GitFileExplorer: React.FC<GitFileExplorerProps> = ({ sessionId }) => {
 
       {/* Success Toast */}
       {successMessage && (
-        <div className="mx-4 mt-4 p-3 bg-green-500/10 border border-green-500/50 rounded-lg text-green-400 text-sm animate-fadeIn">
+        <div className="mx-4 mt-4 p-3 bg-orange-500/10 border border-orange-500/50 text-orange-400 text-sm animate-fadeIn font-mono">
           <div className="flex items-center space-x-2">
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
-            <span>{successMessage}</span>
+            <span>[SUCCESS] {successMessage}</span>
           </div>
         </div>
       )}
@@ -348,14 +400,14 @@ const GitFileExplorer: React.FC<GitFileExplorerProps> = ({ sessionId }) => {
           <div className="h-full overflow-y-auto p-2">
             {isLoading ? (
               <div className="flex items-center justify-center h-full">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div>
+                <div className="animate-spin h-8 w-8 border-2 border-orange-500 border-t-transparent"></div>
               </div>
             ) : fileTree.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full text-gray-500">
+              <div className="flex flex-col items-center justify-center h-full text-orange-600">
                 <svg className="w-16 h-16 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
                 </svg>
-                <p className="text-lg font-semibold">No repository cloned</p>
+                <p className="text-lg font-semibold text-orange-500">NO_REPOSITORY</p>
                 <p className="text-sm">Clone a repository to view files</p>
               </div>
             ) : (
@@ -369,15 +421,15 @@ const GitFileExplorer: React.FC<GitFileExplorerProps> = ({ sessionId }) => {
             {selectedFile ? (
               <>
                 {/* Editor Header */}
-                <div className="flex items-center justify-between p-4 border-b border-gray-700/50 bg-gray-900/50">
+                <div className="flex items-center justify-between p-4 border-b border-orange-500/30 bg-black">
                   <div className="flex items-center space-x-3">
-                    <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="w-5 h-5 text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                     </svg>
                     <div>
-                      <span className="text-white font-semibold">{selectedFile}</span>
+                      <span className="text-orange-400 font-semibold font-mono">{selectedFile}</span>
                       {fileContent !== originalContent && (
-                        <span className="ml-2 text-xs text-yellow-400">● Modified</span>
+                        <span className="ml-2 text-xs text-amber-400">● MODIFIED</span>
                       )}
                     </div>
                   </div>
@@ -385,7 +437,7 @@ const GitFileExplorer: React.FC<GitFileExplorerProps> = ({ sessionId }) => {
                     <button
                       onClick={handleSaveFile}
                       disabled={isSaving || fileContent === originalContent}
-                      className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-700 disabled:text-gray-500 text-white rounded-lg text-sm font-semibold transition-all disabled:cursor-not-allowed flex items-center space-x-2"
+                      className="px-4 py-2 bg-orange-500 hover:bg-orange-600 disabled:bg-orange-900 disabled:text-orange-700 text-black font-bold text-sm transition-all disabled:cursor-not-allowed flex items-center space-x-2"
                     >
                       {isSaving ? (
                         <>
@@ -393,14 +445,14 @@ const GitFileExplorer: React.FC<GitFileExplorerProps> = ({ sessionId }) => {
                             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
                             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
                           </svg>
-                          <span>Saving...</span>
+                          <span>SAVING...</span>
                         </>
                       ) : (
                         <>
                           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
                           </svg>
-                          <span>Save</span>
+                          <span>SAVE</span>
                         </>
                       )}
                     </button>
@@ -409,7 +461,7 @@ const GitFileExplorer: React.FC<GitFileExplorerProps> = ({ sessionId }) => {
                         setViewMode('tree');
                         setSelectedFile(null);
                       }}
-                      className="p-2 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-lg transition-all"
+                      className="p-2 text-orange-500 hover:text-orange-400 hover:bg-orange-500/10 border border-orange-500/30 hover:border-orange-500 transition-all"
                     >
                       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -425,6 +477,17 @@ const GitFileExplorer: React.FC<GitFileExplorerProps> = ({ sessionId }) => {
                     language={getLanguageFromFilePath(selectedFile)}
                     value={fileContent}
                     onChange={handleEditorChange}
+                    onMount={(editor, monaco) => {
+                      // Add Ctrl+S / Cmd+S keyboard shortcut for saving
+                      editor.addCommand(
+                        monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS,
+                        () => {
+                          if (fileContent !== originalContent && !isSaving) {
+                            handleSaveFile();
+                          }
+                        }
+                      );
+                    }}
                     theme="vs-dark"
                     options={{
                       fontSize: 14,
@@ -441,11 +504,11 @@ const GitFileExplorer: React.FC<GitFileExplorerProps> = ({ sessionId }) => {
                 </div>
               </>
             ) : (
-              <div className="flex flex-col items-center justify-center h-full text-gray-500">
+              <div className="flex flex-col items-center justify-center h-full text-orange-600">
                 <svg className="w-16 h-16 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
-                <p className="text-lg font-semibold">No file selected</p>
+                <p className="text-lg font-semibold text-orange-500">NO_FILE_SELECTED</p>
                 <p className="text-sm">Click a file to edit its contents</p>
               </div>
             )}
@@ -455,31 +518,31 @@ const GitFileExplorer: React.FC<GitFileExplorerProps> = ({ sessionId }) => {
 
       {/* Status Bar */}
       {gitStatus && (
-        <div className="border-t border-gray-700/50 bg-gray-900/50 backdrop-blur px-4 py-2">
-          <div className="flex items-center justify-between text-xs">
+        <div className="border-t border-orange-500/30 bg-black px-4 py-2">
+          <div className="flex items-center justify-between text-xs font-mono">
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-1">
-                <span className="text-gray-500">Modified:</span>
-                <span className="px-2 py-0.5 bg-yellow-500/20 text-yellow-400 rounded font-semibold">
+                <span className="text-orange-600">MODIFIED:</span>
+                <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 font-semibold border border-amber-500/40">
                   {gitStatus.modified.length}
                 </span>
               </div>
               <div className="flex items-center space-x-1">
-                <span className="text-gray-500">Untracked:</span>
-                <span className="px-2 py-0.5 bg-blue-500/20 text-blue-400 rounded font-semibold">
+                <span className="text-orange-600">UNTRACKED:</span>
+                <span className="px-2 py-0.5 bg-cyan-500/20 text-cyan-400 font-semibold border border-cyan-500/40">
                   {gitStatus.untracked.length}
                 </span>
               </div>
               <div className="flex items-center space-x-1">
-                <span className="text-gray-500">Staged:</span>
-                <span className="px-2 py-0.5 bg-green-500/20 text-green-400 rounded font-semibold">
+                <span className="text-orange-600">STAGED:</span>
+                <span className="px-2 py-0.5 bg-orange-500/20 text-orange-400 font-semibold border border-orange-500/40">
                   {gitStatus.staged.length}
                 </span>
               </div>
             </div>
             <div className="flex items-center space-x-2">
-              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-              <span className="text-gray-400">Connected</span>
+              <div className="w-2 h-2 bg-orange-500 animate-pulse"></div>
+              <span className="text-orange-500">CONNECTED</span>
             </div>
           </div>
         </div>

@@ -49,61 +49,71 @@ export const Login: React.FC = () => {
 
   if (checking) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-900">
+      <div className="min-h-screen flex items-center justify-center bg-black">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mx-auto"></div>
-          <p className="mt-4 text-gray-400">Checking authentication...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-green-500 mx-auto shadow-neon"></div>
+          <p className="mt-4 text-green-500 font-mono">[ AUTHENTICATING... ]</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-900">
-      <div className="max-w-md w-full space-y-8 p-8 bg-gray-800 rounded-lg shadow-xl">
-        <div>
-          <h2 className="text-center text-3xl font-extrabold text-white">
-            CodeCollab
+    <div className="min-h-screen flex items-center justify-center bg-black relative overflow-hidden">
+      {/* Matrix-like background effect */}
+      <div className="absolute inset-0 opacity-5">
+        <div className="absolute inset-0" style={{
+          backgroundImage: `repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0, 255, 0, 0.03) 2px, rgba(0, 255, 0, 0.03) 4px)`
+        }}></div>
+      </div>
+      
+      <div className="max-w-md w-full space-y-8 p-8 bg-black border border-green-500 rounded-none shadow-neon relative z-10">
+        {/* Terminal-style header */}
+        <div className="border-b border-green-500 pb-4">
+          <div className="flex items-center space-x-2 mb-2">
+            <span className="w-3 h-3 rounded-full bg-red-500"></span>
+            <span className="w-3 h-3 rounded-full bg-yellow-500"></span>
+            <span className="w-3 h-3 rounded-full bg-green-500"></span>
+          </div>
+          <h2 className="text-center text-3xl font-bold text-green-500 font-mono neon-glow">
+            CodeCollab_
           </h2>
-          <p className="mt-2 text-center text-sm text-gray-400">
-            Sign in to your account
-          </p>
         </div>
         
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           {error && (
-            <div className="rounded-md bg-red-900 p-4">
-              <p className="text-sm text-red-200">{error}</p>
+            <div className="border border-red-500 bg-red-500/10 p-4">
+              <p className="text-sm text-red-500 font-mono">[ ERROR ] {error}</p>
             </div>
           )}
           
-          <div className="rounded-md shadow-sm space-y-4">
+          <div className="space-y-4">
             <div>
-              <label htmlFor="username" className="sr-only">
-                Username
+              <label htmlFor="username" className="block text-sm font-mono text-cyan-500 mb-2">
+                USERNAME:
               </label>
               <input
                 id="username"
                 name="username"
                 type="text"
                 required
-                className="appearance-none rounded relative block w-full px-3 py-2 border border-gray-700 bg-gray-700 text-white placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
-                placeholder="Username"
+                className="appearance-none block w-full px-3 py-2 border border-cyan-500/50 bg-black text-cyan-400 placeholder-cyan-700 focus:outline-none focus:border-cyan-400 focus:shadow-[0_0_10px_rgba(34,211,238,0.3)] font-mono transition-all"
+                placeholder="enter_username"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
               />
             </div>
             <div>
-              <label htmlFor="password" className="sr-only">
-                Password
+              <label htmlFor="password" className="block text-sm font-mono text-purple-500 mb-2">
+                PASSWORD:
               </label>
               <input
                 id="password"
                 name="password"
                 type="password"
                 required
-                className="appearance-none rounded relative block w-full px-3 py-2 border border-gray-700 bg-gray-700 text-white placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
-                placeholder="Password"
+                className="appearance-none block w-full px-3 py-2 border border-purple-500/50 bg-black text-purple-400 placeholder-purple-700 focus:outline-none focus:border-purple-400 focus:shadow-[0_0_10px_rgba(168,85,247,0.3)] font-mono transition-all"
+                placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
@@ -114,21 +124,32 @@ export const Login: React.FC = () => {
             <button
               type="submit"
               disabled={loading}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-gray-600 disabled:cursor-not-allowed"
+              className="group relative w-full flex justify-center py-3 px-4 border border-green-500 text-sm font-mono text-green-400 bg-black hover:bg-green-500 hover:text-black focus:outline-none focus:shadow-neon transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? 'Signing in...' : 'Sign in'}
+              {loading ? (
+                <span className="flex items-center">
+                  <span className="animate-pulse">[ ACCESSING... ]</span>
+                </span>
+              ) : (
+                '[ INITIALIZE LOGIN ]'
+              )}
             </button>
           </div>
 
-          <div className="text-center">
+          <div className="text-center border-t border-purple-500/30 pt-4">
             <Link
               to="/register"
-              className="font-medium text-blue-400 hover:text-blue-300"
+              className="font-mono text-purple-400 hover:text-purple-300 hover:shadow-[0_0_10px_rgba(168,85,247,0.3)] transition-all"
             >
-              Don't have an account? Sign up
+              NEW USER? CREATE_ACCOUNT
             </Link>
           </div>
         </form>
+        
+        {/* Blinking cursor effect */}
+        <div className="text-green-500 font-mono text-sm">
+          <span className="terminal-cursor">█</span>
+        </div>
       </div>
     </div>
   );

@@ -8,6 +8,7 @@ import { SessionStats } from './SessionStats';
 import { useKeyboardShortcuts, KeyboardShortcutsHelp } from './KeyboardShortcuts';
 import { EmptyState, NoResultsState } from './EmptyState';
 import { FavoriteButton } from './FavoriteButton';
+import { LanguageIcon, languageConfig } from './LanguageIcons';
 
 interface User {
   id: number;
@@ -18,20 +19,7 @@ interface User {
   created_at: string;
 }
 
-const languageColors: Record<string, { bg: string; badge: string; icon: string }> = {
-  plaintext: { bg: 'from-gray-500/10 to-gray-600/5', badge: 'from-gray-500 to-gray-600', icon: '📄' },
-  python: { bg: 'from-blue-500/10 to-blue-600/5', badge: 'from-blue-500 to-blue-600', icon: '🐍' },
-  javascript: { bg: 'from-yellow-500/10 to-yellow-600/5', badge: 'from-yellow-500 to-yellow-600', icon: '📜' },
-  typescript: { bg: 'from-blue-400/10 to-blue-500/5', badge: 'from-blue-400 to-blue-500', icon: '🔷' },
-  go: { bg: 'from-cyan-500/10 to-cyan-600/5', badge: 'from-cyan-500 to-cyan-600', icon: '🐹' },
-  rust: { bg: 'from-orange-500/10 to-orange-600/5', badge: 'from-orange-500 to-orange-600', icon: '🦀' },
-  vlang: { bg: 'from-purple-500/10 to-purple-600/5', badge: 'from-purple-500 to-purple-600', icon: '⚡' },
-  zig: { bg: 'from-amber-500/10 to-amber-600/5', badge: 'from-amber-500 to-amber-600', icon: '⚡' },
-  elixir: { bg: 'from-purple-400/10 to-purple-500/5', badge: 'from-purple-400 to-purple-500', icon: '💧' },
-  java: { bg: 'from-red-500/10 to-red-600/5', badge: 'from-red-500 to-red-600', icon: '☕' },
-  cpp: { bg: 'from-blue-600/10 to-blue-700/5', badge: 'from-blue-600 to-blue-700', icon: '⚙️' },
-  c: { bg: 'from-gray-500/10 to-gray-600/5', badge: 'from-gray-500 to-gray-600', icon: '🔧' },
-};
+// Language colors are now imported from LanguageIcons.tsx
 
 export const Dashboard: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -50,6 +38,7 @@ export const Dashboard: React.FC = () => {
   const [joinError, setJoinError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [filterLanguage, setFilterLanguage] = useState('all');
+  const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
   const [showShortcutsHelp, setShowShortcutsHelp] = useState(false);
   const [favorites, setFavorites] = useState<string[]>([]);
   const [showOnlyFavorites, setShowOnlyFavorites] = useState(false);
@@ -83,6 +72,18 @@ export const Dashboard: React.FC = () => {
   ];
 
   useKeyboardShortcuts(shortcuts);
+
+  // Close language dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const dropdown = document.getElementById('language-filter-container');
+      if (dropdown && !dropdown.contains(e.target as Node)) {
+        setShowLanguageDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   useEffect(() => {
     loadUserData();
@@ -234,21 +235,21 @@ export const Dashboard: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
+      <div className="min-h-screen bg-black">
         {/* Header Skeleton */}
-        <header className="bg-gray-900/50 backdrop-blur-xl border-b border-gray-800/50 sticky top-0 z-40">
+        <header className="bg-black/90 backdrop-blur-xl border-b border-green-500/30 sticky top-0 z-40">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex justify-between items-center h-20">
               <div className="flex items-center space-x-4">
-                <div className="w-12 h-12 bg-gray-700/50 rounded-xl animate-pulse"></div>
+                <div className="w-12 h-12 bg-green-900/30 border border-green-500/50 animate-pulse"></div>
                 <div>
-                  <div className="h-6 w-32 bg-gray-700/50 rounded animate-pulse mb-1"></div>
-                  <div className="h-3 w-24 bg-gray-700/50 rounded animate-pulse"></div>
+                  <div className="h-6 w-32 bg-green-900/30 border border-green-500/30 animate-pulse mb-1"></div>
+                  <div className="h-3 w-24 bg-green-900/30 border border-green-500/30 animate-pulse"></div>
                 </div>
               </div>
               <div className="flex items-center space-x-4">
-                <div className="h-10 w-32 bg-gray-700/50 rounded-xl animate-pulse"></div>
-                <div className="h-10 w-20 bg-gray-700/50 rounded-xl animate-pulse"></div>
+                <div className="h-10 w-32 bg-green-900/30 border border-green-500/30 animate-pulse"></div>
+                <div className="h-10 w-20 bg-green-900/30 border border-green-500/30 animate-pulse"></div>
               </div>
             </div>
           </div>
@@ -258,19 +259,19 @@ export const Dashboard: React.FC = () => {
           {/* Action Buttons Skeleton */}
           <div className="flex items-center justify-between mb-8">
             <div>
-              <div className="h-8 w-48 bg-gray-700/50 rounded animate-pulse mb-2"></div>
-              <div className="h-4 w-64 bg-gray-700/50 rounded animate-pulse"></div>
+              <div className="h-8 w-48 bg-green-900/30 border border-green-500/30 animate-pulse mb-2"></div>
+              <div className="h-4 w-64 bg-green-900/30 border border-green-500/30 animate-pulse"></div>
             </div>
             <div className="flex gap-3">
-              <div className="h-12 w-36 bg-gray-700/50 rounded-xl animate-pulse"></div>
-              <div className="h-12 w-36 bg-gray-700/50 rounded-xl animate-pulse"></div>
+              <div className="h-12 w-36 bg-green-900/30 border border-green-500/30 animate-pulse"></div>
+              <div className="h-12 w-36 bg-green-900/30 border border-green-500/30 animate-pulse"></div>
             </div>
           </div>
           
           {/* Search Bar Skeleton */}
           <div className="flex gap-4 mb-8">
-            <div className="flex-1 h-14 bg-gray-700/50 rounded-xl animate-pulse"></div>
-            <div className="w-48 h-14 bg-gray-700/50 rounded-xl animate-pulse"></div>
+            <div className="flex-1 h-14 bg-green-900/30 border border-green-500/30 animate-pulse"></div>
+            <div className="w-48 h-14 bg-green-900/30 border border-green-500/30 animate-pulse"></div>
           </div>
           
           <DashboardSkeleton />
@@ -280,54 +281,53 @@ export const Dashboard: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
+    <div className="min-h-screen bg-black">
       {/* Error and Success Notifications */}
       {error && <ErrorAlert message={error} onClose={() => setError('')} />}
       {successMessage && <SuccessAlert message={successMessage} onClose={() => setSuccessMessage('')} />}
       
-      {/* Modern Header */}
-      <header className="bg-gray-900/50 backdrop-blur-xl border-b border-gray-800/50 sticky top-0 z-40">
+      {/* Hacker Theme Header */}
+      <header className="bg-black/90 backdrop-blur-xl border-b border-green-500/30 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-20">
             {/* Logo Section */}
             <div className="flex items-center space-x-4">
               <div className="relative">
-                <div className="w-12 h-12 bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 rounded-xl flex items-center justify-center transform hover:scale-110 transition-transform duration-200 shadow-lg shadow-blue-500/50">
-                  <svg className="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <div className="w-12 h-12 bg-black border-2 border-green-500 flex items-center justify-center transform hover:scale-110 transition-transform duration-200 shadow-neon">
+                  <svg className="w-7 h-7 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                   </svg>
                 </div>
-                <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-gray-900 animate-pulse"></div>
+                <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-black animate-pulse shadow-neon"></div>
               </div>
               <div>
-                <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
-                  CodeCollab
+                <h1 className="text-2xl font-bold text-green-500 font-mono neon-glow">
+                  CodeCollab_
                 </h1>
-                <p className="text-xs text-gray-500 font-medium">Real-time Collaboration</p>
               </div>
             </div>
 
             {/* User Section */}
             <div className="flex items-center space-x-4">
-              <div className="hidden sm:flex items-center space-x-3 px-4 py-2.5 bg-gray-800/50 backdrop-blur rounded-xl border border-gray-700/50 hover:border-gray-600/50 transition-colors">
+              <div className="hidden sm:flex items-center space-x-3 px-4 py-2.5 bg-black border border-green-500/50 hover:border-green-400 transition-colors">
                 <div className="relative">
-                  <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-lg">
+                  <div className="w-10 h-10 bg-black border-2 border-green-500 flex items-center justify-center text-green-400 font-bold text-sm font-mono">
                     {user?.username?.charAt(0).toUpperCase() || 'U'}
                   </div>
-                  <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-green-500 rounded-full border-2 border-gray-900"></div>
+                  <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-green-500 rounded-full border-2 border-black"></div>
                 </div>
                 <div className="text-left">
-                  <p className="text-sm font-semibold text-white">
+                  <p className="text-sm font-semibold text-green-400 font-mono">
                     {user?.username || 'User'}
                   </p>
-                  <p className="text-xs text-gray-400">{user?.email || ''}</p>
+                  <p className="text-xs text-green-600 font-mono">{user?.email || ''}</p>
                 </div>
               </div>
               <button
                 onClick={handleLogout}
-                className="px-5 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-red-600 to-red-700 rounded-xl hover:from-red-700 hover:to-red-800 focus:outline-none focus:ring-2 focus:ring-red-500/50 transition-all duration-200 shadow-lg hover:shadow-red-500/50"
+                className="px-5 py-2.5 text-sm font-mono text-green-400 bg-black border border-red-500/50 hover:bg-red-500 hover:text-black focus:outline-none transition-all duration-200 hover:shadow-[0_0_10px_rgba(255,0,0,0.5)]"
               >
-                <span className="hidden sm:inline">Logout</span>
+                <span className="hidden sm:inline">[ LOGOUT ]</span>
                 <svg className="w-5 h-5 sm:hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
                 </svg>
@@ -344,43 +344,43 @@ export const Dashboard: React.FC = () => {
         {/* Header Actions */}
           <div className="flex items-center justify-between mb-8">
           <div>
-            <h2 className="text-3xl font-bold text-white mb-2 bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-500">
-              Your Sessions
+            <h2 className="text-3xl font-bold text-green-500 mb-2 font-mono neon-glow">
+              YOUR_SESSIONS_
             </h2>
-            <p className="text-gray-400">Create or join collaborative coding sessions</p>
+            <p className="text-green-600 font-mono">// create or join collaborative coding sessions</p>
           </div>
           <div className="flex gap-3">
             <button
               onClick={() => navigate('/git')}
-              className="group px-6 py-3.5 text-sm font-semibold text-white bg-gradient-to-r from-orange-600 to-red-600 rounded-xl hover:from-orange-700 hover:to-red-700 focus:outline-none focus:ring-2 focus:ring-orange-500/50 transition-all duration-200 shadow-lg shadow-orange-500/30 hover:shadow-orange-500/50 hover:scale-105 transform"
+              className="group px-6 py-3.5 text-sm font-mono text-orange-400 bg-black border-2 border-dashed border-orange-500 hover:bg-orange-500 hover:text-black hover:border-solid focus:outline-none transition-all duration-200 hover:shadow-orange-500/50 skew-x-[-2deg]"
             >
-              <span className="flex items-center">
+              <span className="flex items-center skew-x-[2deg]">
                 <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 92 92">
                   <path d="M90.156 41.965L50.036 1.848c-2.467-2.467-6.47-2.467-8.937 0l-8.332 8.332 10.562 10.562c2.623-.872 5.63-.292 7.72 1.798 2.102 2.109 2.678 5.134 1.78 7.768l10.185 10.185c2.634-.898 5.659-.322 7.768 1.78 2.93 2.93 2.93 7.678 0 10.607-2.93 2.93-7.678 2.93-10.607 0-2.21-2.21-2.755-5.458-1.64-8.177L48.73 34.899v29.75c.715.346 1.39.808 1.992 1.41 2.93 2.93 2.93 7.678 0 10.607-2.93 2.93-7.678 2.93-10.607 0-2.93-2.93-2.93-7.678 0-10.607.719-.719 1.545-1.293 2.446-1.722V34.28c-.9-.43-1.727-1.004-2.446-1.722-2.223-2.223-2.762-5.486-1.623-8.214L27.83 13.688 1.848 39.67c-2.467 2.467-2.467 6.47 0 8.937l40.12 40.117c2.467 2.467 6.47 2.467 8.937 0l39.95-39.95c2.468-2.467 2.468-6.47.001-8.937" />
                 </svg>
-                Git Workspace
+                [ GIT ]
               </span>
             </button>
             <button
               onClick={() => setShowJoinModal(true)}
-              className="group px-6 py-3.5 text-sm font-semibold text-white bg-gradient-to-r from-green-600 to-teal-600 rounded-xl hover:from-green-700 hover:to-teal-700 focus:outline-none focus:ring-2 focus:ring-green-500/50 transition-all duration-200 shadow-lg shadow-green-500/30 hover:shadow-green-500/50 hover:scale-105 transform"
+              className="group px-6 py-3.5 text-sm font-mono text-purple-400 bg-black border border-purple-500 hover:bg-purple-500 hover:text-black focus:outline-none transition-all duration-200 hover:shadow-[0_0_15px_rgba(168,85,247,0.5)]"
             >
               <span className="flex items-center">
                 <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/>
                 </svg>
-                Join by Code
+                [ JOIN ]
               </span>
             </button>
             <button
               onClick={() => setShowCreateModal(true)}
-              className="group px-6 py-3.5 text-sm font-semibold text-white bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 rounded-xl hover:from-blue-700 hover:via-purple-700 hover:to-pink-700 focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all duration-200 shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50 hover:scale-105 transform"
+              className="group px-6 py-3.5 text-sm font-mono text-black bg-green-500 border border-green-500 hover:bg-green-400 focus:outline-none transition-all duration-200 shadow-neon"
             >
               <span className="flex items-center">
                 <svg className="w-5 h-5 mr-2 group-hover:rotate-90 transition-transform duration-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/>
                 </svg>
-                New Session
+                [ NEW ]
               </span>
             </button>
           </div>
@@ -388,7 +388,7 @@ export const Dashboard: React.FC = () => {
         <div className="mb-8 flex flex-col sm:flex-row gap-4">
           <div className="flex-1 relative group">
             <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-              <svg className="h-5 w-5 text-gray-500 group-focus-within:text-blue-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="h-5 w-5 text-cyan-600 group-focus-within:text-cyan-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
               </svg>
             </div>
@@ -397,53 +397,75 @@ export const Dashboard: React.FC = () => {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search sessions by name... (Ctrl+K)"
-              className="w-full pl-12 pr-4 py-3.5 bg-gray-800/50 backdrop-blur border border-gray-700/50 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
+              placeholder="search_sessions... (Ctrl+K)"
+              className="w-full pl-12 pr-4 py-3.5 bg-black border border-cyan-500/50 text-cyan-400 placeholder-cyan-700 focus:outline-none focus:border-cyan-400 focus:shadow-[0_0_15px_rgba(34,211,238,0.3)] transition-all font-mono"
             />
           </div>
           <div className="flex gap-3">
-            <div className="relative">
-              <select
-                value={filterLanguage}
-                onChange={(e) => setFilterLanguage(e.target.value)}
-                className="pl-4 pr-10 py-3.5 bg-gray-800/50 backdrop-blur border border-gray-700/50 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all appearance-none cursor-pointer min-w-[200px] font-medium"
+            <div id="language-filter-container" className="relative">
+              <button
+                onClick={() => setShowLanguageDropdown(!showLanguageDropdown)}
+                className="pl-4 pr-10 py-3.5 bg-black border border-green-500/50 text-green-400 focus:outline-none focus:border-green-400 focus:shadow-neon transition-all cursor-pointer min-w-[200px] font-mono flex items-center gap-2"
               >
-                <option value="all">All Languages</option>
-                <option value="python">🐍 Python</option>
-                <option value="javascript">📜 JavaScript</option>
-                <option value="typescript">🔷 TypeScript</option>
-                <option value="go">🐹 Go</option>
-                <option value="rust">🦀 Rust</option>
-                <option value="cpp">⚙️ C++</option>
-                <option value="c">🔧 C</option>
-                <option value="java">☕ Java</option>
-                <option value="vlang">⚡ V Lang</option>
-                <option value="zig">⚡ Zig</option>
-                <option value="elixir">💧 Elixir</option>
-              </select>
+                {filterLanguage !== 'all' && <LanguageIcon language={filterLanguage} className={`w-4 h-4 ${languageConfig[filterLanguage]?.color || 'text-green-400'}`} />}
+                <span>{filterLanguage === 'all' ? 'all_languages' : filterLanguage}</span>
+              </button>
               <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className={`h-5 w-5 text-green-500 transition-transform ${showLanguageDropdown ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7"/>
                 </svg>
               </div>
+              {/* Custom Dropdown */}
+              {showLanguageDropdown && (
+                <div className="absolute top-full left-0 mt-1 w-full bg-black border border-green-500/50 z-50 max-h-80 overflow-y-auto">
+                  {[
+                    { value: 'all', label: 'all_languages' },
+                    { value: 'python', label: 'python' },
+                    { value: 'javascript', label: 'javascript' },
+                    { value: 'typescript', label: 'typescript' },
+                    { value: 'go', label: 'go' },
+                    { value: 'rust', label: 'rust' },
+                    { value: 'cpp', label: 'c++' },
+                    { value: 'c', label: 'c' },
+                    { value: 'java', label: 'java' },
+                    { value: 'vlang', label: 'vlang' },
+                    { value: 'zig', label: 'zig' },
+                    { value: 'elixir', label: 'elixir' },
+                  ].map((lang) => (
+                    <button
+                      key={lang.value}
+                      onClick={() => {
+                        setFilterLanguage(lang.value);
+                        setShowLanguageDropdown(false);
+                      }}
+                      className={`w-full px-4 py-2 text-left flex items-center gap-2 font-mono hover:bg-green-500/20 transition-colors ${
+                        filterLanguage === lang.value ? 'bg-green-500/20 text-green-400' : 'text-green-500'
+                      }`}
+                    >
+                      {lang.value !== 'all' && <LanguageIcon language={lang.value} className={`w-4 h-4 ${languageConfig[lang.value]?.color || 'text-green-400'}`} />}
+                      <span>{lang.label}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
             <button
               onClick={() => setShowOnlyFavorites(!showOnlyFavorites)}
-              className={`px-4 py-3.5 backdrop-blur border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all flex items-center gap-2 ${
+              className={`px-4 py-3.5 border focus:outline-none transition-all flex items-center gap-2 font-mono ${
                 showOnlyFavorites
-                  ? 'bg-yellow-500/20 border-yellow-500/50 text-yellow-400'
-                  : 'bg-gray-800/50 border-gray-700/50 text-gray-400 hover:text-white hover:border-gray-600/50'
+                  ? 'bg-amber-500/20 border-amber-500 text-amber-400 shadow-[0_0_10px_rgba(251,191,36,0.3)]'
+                  : 'bg-black border-amber-500/50 text-amber-600 hover:text-amber-400 hover:border-amber-400'
               }`}
               title="Show only favorites"
             >
               <svg className="w-5 h-5" fill={showOnlyFavorites ? 'currentColor' : 'none'} viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
               </svg>
-              {showOnlyFavorites && <span className="text-sm font-medium">{favorites.length}</span>}
+              {showOnlyFavorites && <span className="text-sm">{favorites.length}</span>}
             </button>
             <button
               onClick={() => setShowShortcutsHelp(true)}
-              className="px-4 py-3.5 bg-gray-800/50 backdrop-blur border border-gray-700/50 rounded-xl text-gray-400 hover:text-white hover:border-gray-600/50 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+              className="px-4 py-3.5 bg-black border border-purple-500/50 text-purple-600 hover:text-purple-400 hover:border-purple-400 focus:outline-none transition-all hover:shadow-[0_0_10px_rgba(168,85,247,0.3)]"
               title="Keyboard shortcuts (/)"
             >
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -457,14 +479,14 @@ export const Dashboard: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {/* Session Cards */}
           {filteredSessions.map((session) => {
-            const langColor = languageColors[session.language] || languageColors.python;
+            const langColor = languageConfig[session.language] || languageConfig.python;
             return (
               <div
                 key={session.id}
-                className="group relative bg-gradient-to-br from-gray-800/50 to-gray-900/50 backdrop-blur rounded-2xl p-6 border border-gray-700/50 hover:border-gray-600/50 transition-all duration-300 hover:shadow-2xl hover:shadow-purple-500/10 hover:-translate-y-1"
+                className="group relative bg-black border border-green-500/30 p-6 hover:border-green-400 transition-all duration-300 hover:shadow-neon"
               >
                 {/* Favorite Button */}
-                <div className="absolute top-3 left-3 z-10">
+                <div className="absolute top-4 right-4 z-10">
                   <FavoriteButton
                     sessionId={session.id}
                     isFavorite={favorites.includes(session.id)}
@@ -473,25 +495,25 @@ export const Dashboard: React.FC = () => {
                 </div>
 
                 {/* Language Badge */}
-                <div className="absolute -top-3 -right-3">
-                  <div className={`px-4 py-2 bg-gradient-to-r ${langColor.badge} rounded-xl shadow-lg transform group-hover:scale-110 transition-transform duration-200`}>
-                    <span className="text-white font-bold text-sm uppercase tracking-wider flex items-center">
-                      <span className="mr-1.5">{langColor.icon}</span>
+                <div className="absolute -top-3 -left-3">
+                  <div className="px-4 py-2 bg-black border border-green-500 shadow-neon-sm transform group-hover:scale-110 transition-transform duration-200">
+                    <span className={`font-bold text-sm uppercase tracking-wider flex items-center font-mono ${langColor.color}`}>
+                      <span className="mr-1.5"><LanguageIcon language={session.language} className="w-4 h-4" /></span>
                       {session.language}
                     </span>
                   </div>
                 </div>
 
                 {/* Session Content - clickable */}
-                <div className="mt-4 cursor-pointer" onClick={() => handleJoinSession(session.id)}>
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-xl font-bold text-white group-hover:text-blue-400 transition-colors line-clamp-2 flex-1">
+                <div className="mt-6 cursor-pointer" onClick={() => handleJoinSession(session.id)}>
+                  <div className="flex items-center justify-between mb-3 pr-10">
+                    <h3 className="text-xl font-bold text-green-400 group-hover:text-green-300 transition-colors line-clamp-2 flex-1 font-mono">
                       {session.name}
                     </h3>
                     {/* Recently Active Badge */}
                     {session.last_accessed_at && new Date(session.last_accessed_at).getTime() > Date.now() - 3600000 && (
-                      <span className="ml-2 px-2 py-1 text-xs font-semibold bg-green-500/20 text-green-400 rounded-lg border border-green-500/30">
-                        Active
+                      <span className="ml-2 px-2 py-1 text-xs font-mono bg-green-500/20 text-green-400 border border-green-500/50">
+                        [ ACTIVE ]
                       </span>
                     )}
                   </div>
@@ -502,13 +524,13 @@ export const Dashboard: React.FC = () => {
                       {session.tags.slice(0, 3).map((tag, index) => (
                         <span
                           key={index}
-                          className="px-2 py-0.5 text-xs font-medium bg-blue-600/20 text-blue-300 rounded border border-blue-500/30"
+                          className="px-2 py-0.5 text-xs font-mono bg-cyan-900/30 text-cyan-500 border border-cyan-500/30"
                         >
-                          {tag}
+                          #{tag}
                         </span>
                       ))}
                       {session.tags.length > 3 && (
-                        <span className="px-2 py-0.5 text-xs font-medium bg-gray-700/50 text-gray-400 rounded border border-gray-600/50">
+                        <span className="px-2 py-0.5 text-xs font-mono bg-black text-cyan-600 border border-cyan-500/30">
                           +{session.tags.length - 3}
                         </span>
                       )}
@@ -518,28 +540,28 @@ export const Dashboard: React.FC = () => {
                   <div className="flex items-center justify-between text-sm mt-2">
                     <div className="flex items-center space-x-4">
                       {/* Participants */}
-                      <div className="flex items-center text-gray-400 group-hover:text-gray-300 transition-colors">
+                      <div className="flex items-center text-purple-500 group-hover:text-purple-400 transition-colors font-mono">
                         <div className="flex -space-x-2 mr-2">
                           {[...Array(Math.min(session.participants.length, 3))].map((_, i) => (
                             <div
                               key={i}
-                              className="w-7 h-7 rounded-full border-2 border-gray-800 bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold"
+                              className="w-7 h-7 border-2 border-black bg-purple-900 flex items-center justify-center text-purple-400 text-xs font-bold font-mono"
                               title={session.participants[i] || ''}
                             >
                               {(session.participants[i] || 'U').charAt(0).toUpperCase()}
                             </div>
                           ))}
                           {session.participants.length > 3 && (
-                            <div className="w-7 h-7 rounded-full border-2 border-gray-800 bg-gray-700 flex items-center justify-center text-white text-xs font-bold">
+                            <div className="w-7 h-7 border-2 border-black bg-black flex items-center justify-center text-purple-500 text-xs font-bold font-mono">
                               +{session.participants.length - 3}
                             </div>
                           )}
                         </div>
-                        <span className="font-medium">{session.participants.length}</span>
+                        <span>{session.participants.length}</span>
                       </div>
 
                       {/* Date */}
-                      <div className="flex items-center text-gray-400">
+                      <div className="flex items-center text-amber-600 font-mono">
                         <svg className="w-4 h-4 mr-1.5" fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd"/>
                         </svg>
@@ -549,10 +571,10 @@ export const Dashboard: React.FC = () => {
                   </div>
 
                   {/* Join Button Overlay */}
-                  <div className="mt-4 pt-4 border-t border-gray-700/50">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-400 font-medium">Click to join</span>
-                      <svg className="w-5 h-5 text-gray-400 group-hover:text-blue-400 group-hover:translate-x-1 transition-all" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <div className="mt-4 pt-4 border-t border-green-500/30">
+                    <div className="flex items-center justify-between font-mono">
+                      <span className="text-sm text-green-600">click_to_join</span>
+                      <svg className="w-5 h-5 text-green-500 group-hover:text-green-400 group-hover:translate-x-1 transition-all" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6"/>
                       </svg>
                     </div>
@@ -560,7 +582,7 @@ export const Dashboard: React.FC = () => {
                 </div>
 
                 {/* Hover Glow Effect */}
-                <div className={`absolute inset-0 bg-gradient-to-br ${langColor.bg} rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 -z-10`}></div>
+                <div className="absolute inset-0 bg-gradient-to-br from-green-900/10 to-black opacity-0 group-hover:opacity-100 transition-opacity duration-300 -z-10"></div>
               </div>
             );
           })}
@@ -569,17 +591,23 @@ export const Dashboard: React.FC = () => {
           {workspaces.map((workspace) => (
             <div
               key={workspace.workspace_id}
-              className="group relative bg-gradient-to-br from-orange-900/30 to-red-900/30 backdrop-blur rounded-2xl p-6 border border-orange-700/50 hover:border-orange-600/50 transition-all duration-300 hover:shadow-2xl hover:shadow-orange-500/10 hover:-translate-y-1 cursor-pointer"
+              className="group relative bg-black border-2 border-dashed border-orange-500/30 p-6 hover:border-orange-400 transition-all duration-300 hover:shadow-orange-500/30 cursor-pointer"
               onClick={() => navigate('/git')}
             >
+              {/* Corner accents */}
+              <div className="absolute top-0 left-0 w-3 h-3 border-t-2 border-l-2 border-orange-500"></div>
+              <div className="absolute top-0 right-0 w-3 h-3 border-t-2 border-r-2 border-orange-500"></div>
+              <div className="absolute bottom-0 left-0 w-3 h-3 border-b-2 border-l-2 border-orange-500"></div>
+              <div className="absolute bottom-0 right-0 w-3 h-3 border-b-2 border-r-2 border-orange-500"></div>
+              
               {/* Git Badge */}
               <div className="absolute -top-3 -right-3">
-                <div className="px-4 py-2 bg-gradient-to-r from-orange-600 to-red-600 rounded-xl shadow-lg transform group-hover:scale-110 transition-transform duration-200">
-                  <span className="text-white font-bold text-sm uppercase tracking-wider flex items-center">
+                <div className="px-4 py-2 bg-black border-2 border-dashed border-orange-500 shadow-orange-500/30 shadow-md transform group-hover:scale-110 group-hover:rotate-3 transition-all duration-200">
+                  <span className="text-orange-400 font-bold text-sm uppercase tracking-wider flex items-center font-mono">
                     <svg className="w-4 h-4 mr-1.5" fill="currentColor" viewBox="0 0 92 92">
                       <path d="M90.156 41.965L50.036 1.848c-2.467-2.467-6.47-2.467-8.937 0l-8.332 8.332 10.562 10.562c2.623-.872 5.63-.292 7.72 1.798 2.102 2.109 2.678 5.134 1.78 7.768l10.185 10.185c2.634-.898 5.659-.322 7.768 1.78 2.93 2.93 2.93 7.678 0 10.607-2.93 2.93-7.678 2.93-10.607 0-2.21-2.21-2.755-5.458-1.64-8.177L48.73 34.899v29.75c.715.346 1.39.808 1.992 1.41 2.93 2.93 2.93 7.678 0 10.607-2.93 2.93-7.678 2.93-10.607 0-2.93-2.93-2.93-7.678 0-10.607.719-.719 1.545-1.293 2.446-1.722V34.28c-.9-.43-1.727-1.004-2.446-1.722-2.223-2.223-2.762-5.486-1.623-8.214L27.83 13.688 1.848 39.67c-2.467 2.467-2.467 6.47 0 8.937l40.12 40.117c2.467 2.467 6.47 2.467 8.937 0l39.95-39.95c2.468-2.467 2.468-6.47.001-8.937" />
                     </svg>
-                    GIT REPO
+                    GIT
                   </span>
                 </div>
               </div>
@@ -587,44 +615,44 @@ export const Dashboard: React.FC = () => {
               {/* Workspace Content */}
               <div className="mt-4">
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-xl font-bold text-white group-hover:text-orange-400 transition-colors line-clamp-2 flex-1">
-                    {workspace.name}
+                  <h3 className="text-xl font-bold text-orange-400 group-hover:text-orange-300 transition-colors line-clamp-2 flex-1 font-mono">
+                    <span className="text-orange-600">//</span> {workspace.name}
                   </h3>
                   {workspace.is_dirty && (
-                    <span className="ml-2 px-2 py-1 text-xs font-semibold bg-yellow-500/20 text-yellow-400 rounded-lg border border-yellow-500/30">
-                      Modified
+                    <span className="ml-2 px-2 py-1 text-xs font-mono bg-yellow-500/20 text-yellow-400 border border-dashed border-yellow-500/50">
+                      [ MODIFIED ]
                     </span>
                   )}
                 </div>
 
                 {/* Repository Info */}
                 <div className="flex flex-wrap gap-2 mt-3">
-                  <div className="flex items-center text-sm text-orange-300 bg-orange-900/30 px-3 py-1.5 rounded-lg border border-orange-700/30">
+                  <div className="flex items-center text-sm text-orange-400 bg-orange-900/30 px-3 py-1.5 border border-dashed border-orange-500/30 font-mono">
                     <svg className="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14"/>
                     </svg>
-                    <span className="font-medium">{workspace.branch}</span>
+                    <span>{workspace.branch}</span>
                   </div>
-                  <div className="flex items-center text-sm text-gray-300 bg-gray-800/50 px-3 py-1.5 rounded-lg border border-gray-700/30">
+                  <div className="flex items-center text-sm text-orange-500 bg-black px-3 py-1.5 border border-dashed border-orange-500/30 font-mono">
                     <svg className="w-4 h-4 mr-1.5" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd"/>
                     </svg>
-                    <span className="font-medium">{workspace.commit_count} commits</span>
+                    <span>{workspace.commit_count} commits</span>
                   </div>
                 </div>
 
                 {/* Remote URL */}
                 {workspace.remote_url && (
-                  <div className="mt-3 text-xs text-gray-400 truncate font-mono bg-gray-900/50 px-3 py-2 rounded-lg border border-gray-700/30">
+                  <div className="mt-3 text-xs text-orange-600 truncate font-mono bg-black px-3 py-2 border border-dashed border-orange-500/30">
                     {workspace.remote_url}
                   </div>
                 )}
 
                 {/* Open Button */}
-                <div className="mt-4 pt-4 border-t border-orange-700/50">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-400 font-medium">Click to open</span>
-                    <svg className="w-5 h-5 text-gray-400 group-hover:text-orange-400 group-hover:translate-x-1 transition-all" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <div className="mt-4 pt-4 border-t border-dashed border-orange-500/30">
+                  <div className="flex items-center justify-between font-mono">
+                    <span className="text-sm text-orange-600">// click_to_open</span>
+                    <svg className="w-5 h-5 text-orange-500 group-hover:text-orange-400 group-hover:translate-x-1 transition-all" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6"/>
                     </svg>
                   </div>
@@ -632,7 +660,7 @@ export const Dashboard: React.FC = () => {
               </div>
 
               {/* Hover Glow Effect */}
-              <div className="absolute inset-0 bg-gradient-to-br from-orange-600/20 to-red-600/20 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 -z-10"></div>
+              <div className="absolute inset-0 bg-gradient-to-br from-orange-900/10 to-black opacity-0 group-hover:opacity-100 transition-opacity duration-300 -z-10"></div>
             </div>
           ))}
         </div>
@@ -670,33 +698,29 @@ export const Dashboard: React.FC = () => {
       {/* Create Session Modal */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-black/95 backdrop-blur-lg flex items-center justify-center p-4 z-50 animate-fadeIn">
-          <div className="bg-gradient-to-br from-slate-900 via-gray-900 to-slate-950 rounded-3xl shadow-2xl max-w-2xl w-full max-h-[92vh] overflow-y-auto border border-purple-500/20 animate-slideUp relative">
-            {/* Decorative Background Elements */}
-            <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-br from-purple-600/30 to-blue-600/30 rounded-full blur-3xl -z-10 pointer-events-none animate-pulse"></div>
-            <div className="absolute bottom-0 left-0 w-96 h-96 bg-gradient-to-tr from-blue-600/30 to-pink-600/30 rounded-full blur-3xl -z-10 pointer-events-none animate-pulse" style={{ animationDelay: '1s' }}></div>
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full bg-gradient-to-r from-purple-600/10 via-transparent to-blue-600/10 rounded-3xl -z-10 pointer-events-none"></div>
+          <div className="bg-black border-2 border-green-500 shadow-neon max-w-2xl w-full max-h-[92vh] overflow-y-auto relative">
             
             {/* Modal Header - Sticky */}
-            <div className="sticky top-0 bg-gradient-to-br from-slate-900/95 via-gray-900/95 to-slate-950/95 z-20 px-8 pt-8 pb-6 border-b border-purple-500/20 backdrop-blur-xl">
+            <div className="sticky top-0 bg-black z-20 px-8 pt-8 pb-6 border-b border-green-500/50">
               <div className="flex justify-between items-start">
                 <div>
                   <div className="flex items-center space-x-3 mb-3">
-                    <div className="p-3 bg-gradient-to-br from-purple-500 via-blue-500 to-pink-500 rounded-2xl shadow-lg shadow-purple-500/50 animate-pulse">
-                      <svg className="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <div className="p-3 bg-black border-2 border-green-500 shadow-neon">
+                      <svg className="w-7 h-7 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                       </svg>
                     </div>
-                    <h3 className="text-5xl font-black bg-gradient-to-r from-purple-400 via-blue-400 to-pink-400 bg-clip-text text-transparent drop-shadow-2xl">
-                      Create Session
+                    <h3 className="text-4xl font-bold text-green-500 font-mono neon-glow">
+                      NEW_SESSION_
                     </h3>
                   </div>
-                  <p className="text-gray-400 text-sm ml-16 font-medium">✨ Start a new collaboration workspace</p>
+                  <p className="text-green-600 text-sm ml-16 font-mono">// initialize new workspace</p>
                 </div>
                 <button
                   onClick={() => setShowCreateModal(false)}
-                  className="text-gray-400 hover:text-white transition-all p-3 hover:bg-red-500/20 rounded-xl hover:rotate-90 duration-300 group"
+                  className="text-green-500 hover:text-red-500 transition-all p-3 hover:bg-red-500/20 border border-transparent hover:border-red-500"
                 >
-                  <svg className="w-6 h-6 group-hover:scale-110 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/>
                   </svg>
                 </button>
@@ -707,12 +731,12 @@ export const Dashboard: React.FC = () => {
             <div className="px-8 py-6 space-y-7">
               {/* Session Name Input */}
               <div className="group">
-                <label htmlFor="sessionName" className="flex items-center text-sm font-bold text-gray-200 mb-3">
-                  <span className="bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent text-base">Session Name</span>
-                  <span className="text-red-400 ml-1.5 text-lg">*</span>
+                <label htmlFor="sessionName" className="flex items-center text-sm font-bold text-green-400 mb-3 font-mono">
+                  <span>SESSION_NAME</span>
+                  <span className="text-red-400 ml-1.5">*</span>
                 </label>
                 <div className="relative">
-                  <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-purple-400 transition-colors duration-300">
+                  <div className="absolute left-4 top-1/2 -translate-y-1/2 text-green-600 group-focus-within:text-green-400 transition-colors duration-300">
                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                     </svg>
@@ -722,8 +746,8 @@ export const Dashboard: React.FC = () => {
                     id="sessionName"
                     value={newSessionName}
                     onChange={(e) => setNewSessionName(e.target.value)}
-                    placeholder="e.g., Python API Development"
-                    className="w-full pl-12 pr-12 py-4 bg-slate-900/90 backdrop-blur border-2 border-gray-700/50 rounded-2xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 transition-all text-base hover:border-gray-600/50 shadow-lg"
+                    placeholder="python_api_dev"
+                    className="w-full pl-12 pr-12 py-4 bg-black border-2 border-green-500/50 text-green-400 placeholder-green-700 focus:outline-none focus:border-green-400 focus:shadow-neon transition-all font-mono"
                     autoFocus
                   />
                   {newSessionName && (
@@ -741,23 +765,23 @@ export const Dashboard: React.FC = () => {
 
               {/* Description */}
               <div>
-                <label htmlFor="sessionDescription" className="block text-sm font-bold text-gray-200 mb-3">
-                  Description <span className="text-gray-500 text-xs font-normal">(optional)</span>
+                <label htmlFor="sessionDescription" className="block text-sm font-bold text-green-400 mb-3 font-mono">
+                  DESCRIPTION: <span className="text-green-700">(optional)</span>
                 </label>
                 <textarea
                   id="sessionDescription"
                   value={newSessionDescription}
                   onChange={(e) => setNewSessionDescription(e.target.value)}
-                  placeholder="e.g., Building REST APIs with FastAPI"
+                  placeholder="building_rest_apis_with_fastapi"
                   rows={3}
-                  className="w-full px-5 py-4 bg-slate-900/90 backdrop-blur border-2 border-gray-700/50 rounded-2xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 transition-all text-base resize-none hover:border-gray-600/50 shadow-lg"
+                  className="w-full px-5 py-4 bg-black border-2 border-green-500/50 text-green-400 placeholder-green-700 focus:outline-none focus:border-green-400 focus:shadow-neon transition-all font-mono resize-none"
                 />
               </div>
 
               {/* Tags */}
               <div>
-                <label htmlFor="sessionTags" className="block text-sm font-bold text-gray-200 mb-3">
-                  Tags <span className="text-gray-500 text-xs font-normal">(optional)</span>
+                <label htmlFor="sessionTags" className="block text-sm font-bold text-green-400 mb-3 font-mono">
+                  TAGS: <span className="text-green-700">(optional)</span>
                 </label>
                 <div className="space-y-3">
                   <div className="flex space-x-2">
@@ -767,15 +791,15 @@ export const Dashboard: React.FC = () => {
                       value={tagInput}
                       onChange={(e) => setTagInput(e.target.value)}
                       onKeyDown={handleTagInputKeyDown}
-                      placeholder="e.g., web, api, backend"
-                      className="flex-1 px-5 py-3 bg-slate-900/90 backdrop-blur border-2 border-gray-700/50 rounded-2xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 transition-all text-base hover:border-gray-600/50 shadow-lg"
+                      placeholder="web, api, backend"
+                      className="flex-1 px-5 py-3 bg-black border-2 border-green-500/50 text-green-400 placeholder-green-700 focus:outline-none focus:border-green-400 focus:shadow-neon transition-all font-mono"
                     />
                     <button
                       type="button"
                       onClick={handleAddTag}
-                      className="px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white rounded-2xl transition-all font-bold shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50 hover:scale-105 transform"
+                      className="px-6 py-3 bg-green-500 hover:bg-green-400 text-black font-mono font-bold transition-all shadow-neon"
                     >
-                      Add
+                      [ ADD ]
                     </button>
                   </div>
                   {newSessionTags.length > 0 && (
@@ -783,13 +807,13 @@ export const Dashboard: React.FC = () => {
                       {newSessionTags.map((tag, index) => (
                         <div
                           key={index}
-                          className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-purple-600/20 to-blue-600/20 border border-purple-500/40 rounded-xl text-purple-300 text-sm font-medium shadow-lg backdrop-blur hover:scale-105 transition-transform"
+                          className="flex items-center space-x-2 px-4 py-2 bg-green-900/30 border border-green-500/50 text-green-400 text-sm font-mono"
                         >
                           <span>#{tag}</span>
                           <button
                             type="button"
                             onClick={() => handleRemoveTag(tag)}
-                            className="text-purple-400 hover:text-red-400 transition-colors"
+                            className="text-green-500 hover:text-red-400 transition-colors"
                           >
                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -803,25 +827,24 @@ export const Dashboard: React.FC = () => {
               </div>
 
               {/* Action Buttons */}
-              <div className="flex space-x-4 pt-8 sticky bottom-0 bg-gradient-to-br from-slate-900/95 via-gray-900/95 to-slate-950/95 pb-4 border-t border-purple-500/20 backdrop-blur-xl -mx-8 px-8">
+              <div className="flex space-x-4 pt-8 sticky bottom-0 bg-black pb-4 border-t border-green-500/30 -mx-8 px-8">
                 <button
                   onClick={() => setShowCreateModal(false)}
-                  className="flex-1 px-6 py-4 text-base font-bold text-gray-300 bg-slate-800/80 backdrop-blur rounded-2xl hover:bg-slate-700/80 focus:outline-none focus:ring-2 focus:ring-gray-500/50 transition-all border-2 border-gray-600/50 hover:border-gray-500/50 hover:scale-105 transform shadow-lg"
+                  className="flex-1 px-6 py-4 font-mono font-bold text-green-400 bg-black border-2 border-green-500/50 hover:border-green-400 focus:outline-none transition-all"
                 >
-                  Cancel
+                  [ CANCEL ]
                 </button>
                 <button
                   onClick={handleCreateSession}
                   disabled={!newSessionName.trim()}
-                  className="flex-1 px-6 py-4 text-base font-black text-white bg-gradient-to-r from-purple-600 via-blue-600 to-pink-600 rounded-2xl hover:from-purple-700 hover:via-blue-700 hover:to-pink-700 focus:outline-none focus:ring-4 focus:ring-purple-500/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-2xl shadow-purple-500/50 hover:shadow-purple-500/70 disabled:shadow-none hover:scale-110 transform disabled:transform-none animate-pulse disabled:animate-none relative overflow-hidden group"
+                  className="flex-1 px-6 py-4 font-mono font-bold text-black bg-green-500 hover:bg-green-400 focus:outline-none transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-neon disabled:shadow-none"
                 >
-                  <span className="relative z-10 flex items-center justify-center space-x-2">
+                  <span className="flex items-center justify-center space-x-2">
                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                     </svg>
-                    <span>Create Session</span>
+                    <span>[ CREATE ]</span>
                   </span>
-                  <div className="absolute inset-0 bg-gradient-to-r from-pink-600 via-purple-600 to-blue-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                 </button>
               </div>
             </div>
@@ -831,17 +854,14 @@ export const Dashboard: React.FC = () => {
 
       {/* Join by Code Modal */}
       {showJoinModal && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
-          <div className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-3xl shadow-2xl max-w-md w-full p-8 border border-gray-700/50 animate-slideUp relative overflow-hidden">
-            {/* Decorative Background Elements */}
-            <div className="absolute top-0 right-0 w-64 h-64 bg-green-500/10 rounded-full blur-3xl -z-10"></div>
-            <div className="absolute bottom-0 left-0 w-64 h-64 bg-teal-500/10 rounded-full blur-3xl -z-10"></div>
+        <div className="fixed inset-0 bg-black/95 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
+          <div className="bg-black border-2 border-green-500 shadow-neon max-w-md w-full p-8 relative overflow-hidden">
             
             {/* Modal Header */}
             <div className="flex justify-between items-center mb-8">
               <div>
-                <h3 className="text-3xl font-bold text-white mb-1">Join Session</h3>
-                <p className="text-gray-400 text-sm">Enter the 8-character share code</p>
+                <h3 className="text-3xl font-bold text-green-500 mb-1 font-mono neon-glow">JOIN_SESSION_</h3>
+                <p className="text-green-600 text-sm font-mono">// enter 8-character share code</p>
               </div>
               <button
                 onClick={() => {
@@ -849,7 +869,7 @@ export const Dashboard: React.FC = () => {
                   setJoinCode('');
                   setJoinError('');
                 }}
-                className="text-gray-400 hover:text-white transition-colors p-2 hover:bg-gray-700/50 rounded-xl"
+                className="text-green-500 hover:text-red-500 transition-colors p-2 border border-transparent hover:border-red-500"
               >
                 <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/>
@@ -861,12 +881,12 @@ export const Dashboard: React.FC = () => {
             <div className="space-y-6">
               {/* Share Code Input */}
               <div>
-                <label htmlFor="joinCode" className="block text-sm font-semibold text-gray-300 mb-3">
-                  Share Code <span className="text-red-400">*</span>
+                <label htmlFor="joinCode" className="block text-sm font-mono text-green-400 mb-3">
+                  SHARE_CODE: <span className="text-red-400">*</span>
                 </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
-                    <svg className="w-5 h-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="w-5 h-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/>
                     </svg>
                   </div>
@@ -878,30 +898,27 @@ export const Dashboard: React.FC = () => {
                       setJoinCode(e.target.value.toUpperCase());
                       setJoinError('');
                     }}
-                    placeholder="e.g., A3B7K9M2"
+                    placeholder="A3B7K9M2"
                     maxLength={8}
-                    className="w-full pl-14 pr-5 py-4 bg-gray-900/50 backdrop-blur border border-gray-700/50 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-500/50 transition-all text-lg font-mono tracking-wider uppercase"
+                    className="w-full pl-14 pr-5 py-4 bg-black border-2 border-green-500/50 text-green-400 placeholder-green-700 focus:outline-none focus:border-green-400 focus:shadow-neon transition-all text-lg font-mono tracking-wider uppercase"
                     autoFocus
                   />
                   {joinCode.length === 8 && (
                     <div className="absolute right-4 top-1/2 -translate-y-1/2">
-                      <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                      <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse shadow-neon-sm"></div>
                     </div>
                   )}
                 </div>
-                <p className="mt-2 text-xs text-gray-500">
-                  <svg className="w-4 h-4 inline mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                  </svg>
-                  Share codes are 8 characters (letters and numbers)
+                <p className="mt-2 text-xs text-green-700 font-mono">
+                  // codes are 8 characters (letters and numbers)
                 </p>
                 {joinError && (
-                  <div className="mt-3 p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
-                    <p className="text-sm text-red-400 flex items-center">
+                  <div className="mt-3 p-3 bg-red-500/10 border border-red-500">
+                    <p className="text-sm text-red-400 flex items-center font-mono">
                       <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
                       </svg>
-                      {joinError}
+                      [ ERROR ] {joinError}
                     </p>
                   </div>
                 )}
@@ -915,16 +932,16 @@ export const Dashboard: React.FC = () => {
                     setJoinCode('');
                     setJoinError('');
                   }}
-                  className="flex-1 px-6 py-4 text-base font-semibold text-gray-300 bg-gray-800/50 backdrop-blur rounded-xl hover:bg-gray-700/50 focus:outline-none focus:ring-2 focus:ring-gray-500/50 transition-all border border-gray-700/50"
+                  className="flex-1 px-6 py-4 font-mono font-bold text-green-400 bg-black border-2 border-green-500/50 hover:border-green-400 focus:outline-none transition-all"
                 >
-                  Cancel
+                  [ CANCEL ]
                 </button>
                 <button
                   onClick={handleJoinByCode}
                   disabled={joinCode.length !== 8}
-                  className="flex-1 px-6 py-4 text-base font-semibold text-white bg-gradient-to-r from-green-600 to-teal-600 rounded-xl hover:from-green-700 hover:to-teal-700 focus:outline-none focus:ring-2 focus:ring-green-500/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-green-500/30 hover:shadow-green-500/50 disabled:shadow-none hover:scale-105 transform disabled:transform-none"
+                  className="flex-1 px-6 py-4 font-mono font-bold text-black bg-green-500 hover:bg-green-400 focus:outline-none transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-neon disabled:shadow-none"
                 >
-                  Join Session
+                  [ JOIN ]
                 </button>
               </div>
             </div>

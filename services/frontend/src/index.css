@@ -2,23 +2,74 @@
 @tailwind components;
 @tailwind utilities;
 
+@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@300;400;500;600;700&family=VT323&display=swap');
+
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
 }
 
+html, body, #root {
+  background-color: #000000;
+  min-height: 100vh;
+}
+
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
+  font-family: 'Fira Code', 'Monaco', 'Consolas', monospace;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  background-color: #000000;
+  color: #00ff00;
 }
 
 code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+  font-family: 'Fira Code', source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
+}
+
+/* Hacker Theme Base Styles */
+.hacker-text {
+  color: #00ff00;
+}
+
+.hacker-text-dim {
+  color: #00aa00;
+}
+
+.hacker-border {
+  border-color: #00ff00;
+  box-shadow: 0 0 3px rgba(0, 255, 0, 0.2);
+}
+
+.hacker-bg {
+  background-color: #000000;
+}
+
+.hacker-bg-elevated {
+  background-color: #0a0a0a;
+}
+
+/* Neon glow effect - subtle, readable version */
+.neon-glow {
+  text-shadow: 0 0 2px rgba(0, 255, 0, 0.5);
+}
+
+.neon-box {
+  box-shadow: 0 0 3px rgba(0, 255, 0, 0.3), inset 0 0 2px rgba(0, 255, 0, 0.05);
+}
+
+/* Shadow for boxes - subtle glow */
+.shadow-neon {
+  box-shadow: 0 0 5px rgba(0, 255, 0, 0.3);
+}
+
+.shadow-neon-sm {
+  box-shadow: 0 0 3px rgba(0, 255, 0, 0.2);
+}
+
+.shadow-neon-lg {
+  box-shadow: 0 0 8px rgba(0, 255, 0, 0.4);
 }
 
 /* Custom Animations */
@@ -51,6 +102,26 @@ code {
   }
 }
 
+@keyframes matrixRain {
+  0% {
+    transform: translateY(-100%);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+}
+
+@keyframes terminalBlink {
+  0%, 50% {
+    opacity: 1;
+  }
+  51%, 100% {
+    opacity: 0;
+  }
+}
+
 .animate-fadeIn {
   animation: fadeIn 0.3s ease-in-out;
 }
@@ -59,63 +130,104 @@ code {
   animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+.terminal-cursor {
+  animation: terminalBlink 1s step-end infinite;
+}
+
 /* Line Clamp Utility */
 .line-clamp-2 {
   display: -webkit-box;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
 
-/* Scrollbar Styling */
+/* Scrollbar Styling - Hacker Theme */
 ::-webkit-scrollbar {
-  width: 12px;
-  height: 12px;
+  width: 8px;
+  height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #1a1a1a;
-  border-radius: 10px;
+  background: #000000;
+  border-left: 1px solid #00ff00;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, #4b5563 0%, #374151 100%);
-  border-radius: 10px;
-  border: 2px solid #1a1a1a;
+  background: linear-gradient(180deg, #00ff00 0%, #00aa00 100%);
+  border-radius: 0;
+  border: 1px solid #00ff00;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, #6b7280 0%, #4b5563 100%);
+  background: linear-gradient(180deg, #33ff33 0%, #00ff00 100%);
 }
 
 /* Firefox Scrollbar */
 * {
   scrollbar-width: thin;
-  scrollbar-color: #4b5563 #1a1a1a;
+  scrollbar-color: #00ff00 #000000;
 }
 
-/* Selection Color */
+/* Selection Color - Hacker Green */
 ::selection {
-  background-color: rgba(139, 92, 246, 0.3);
-  color: #fff;
+  background-color: rgba(0, 255, 0, 0.3);
+  color: #00ff00;
 }
 
 ::-moz-selection {
-  background-color: rgba(139, 92, 246, 0.3);
-  color: #fff;
+  background-color: rgba(0, 255, 0, 0.3);
+  color: #00ff00;
 }
 
-/* Glass Effect */
+/* Glass Effect - Hacker Version */
 .glass {
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(0, 0, 0, 0.8);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(0, 255, 0, 0.2);
 }
 
-/* Monaco Editor Remote Cursor Styles */
+/* Scanline Effect */
+.scanline::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.1) 2px,
+    rgba(0, 0, 0, 0.1) 4px
+  );
+  pointer-events: none;
+  z-index: 100;
+}
+
+/* CRT Monitor Effect */
+.crt-effect {
+  position: relative;
+}
+
+.crt-effect::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: radial-gradient(ellipse at center, transparent 0%, rgba(0, 0, 0, 0.3) 100%);
+  pointer-events: none;
+}
+
+/* Monaco Editor Remote Cursor Styles - Hacker Theme */
 .remote-cursor {
-  background-color: rgba(59, 130, 246, 0.3) !important;
-  border-left: 2px solid rgb(59, 130, 246) !important;
+  background-color: rgba(0, 255, 0, 0.3) !important;
+  border-left: 2px solid #00ff00 !important;
   position: relative;
   animation: cursorBlink 1s infinite;
 }
@@ -136,14 +248,14 @@ code {
   padding: 2px 6px;
   font-size: 11px;
   font-weight: 600;
-  color: white;
-  background: rgb(59, 130, 246);
+  color: #000000;
+  background: #00ff00;
   border-radius: 4px;
   white-space: nowrap;
   z-index: 1000;
   pointer-events: none;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
   animation: fadeInDown 0.2s ease-out;
+  font-family: 'Fira Code', monospace;
 }
 
 @keyframes fadeInDown {
@@ -157,34 +269,67 @@ code {
   }
 }
 
-/* Cursor colors for different participants */
+/* Cursor colors for different participants - Hacker Theme */
 .remote-cursor[data-user-color="blue"] {
-  background-color: rgba(59, 130, 246, 0.3) !important;
-  border-left-color: rgb(59, 130, 246) !important;
+  background-color: rgba(0, 255, 255, 0.3) !important;
+  border-left-color: #00ffff !important;
 }
 
 .remote-cursor[data-user-color="green"] {
-  background-color: rgba(34, 197, 94, 0.3) !important;
-  border-left-color: rgb(34, 197, 94) !important;
+  background-color: rgba(0, 255, 0, 0.3) !important;
+  border-left-color: #00ff00 !important;
 }
 
 .remote-cursor[data-user-color="purple"] {
-  background-color: rgba(168, 85, 247, 0.3) !important;
-  border-left-color: rgb(168, 85, 247) !important;
+  background-color: rgba(255, 0, 255, 0.3) !important;
+  border-left-color: #ff00ff !important;
 }
 
 .remote-cursor[data-user-color="orange"] {
-  background-color: rgba(249, 115, 22, 0.3) !important;
-  border-left-color: rgb(249, 115, 22) !important;
+  background-color: rgba(255, 165, 0, 0.3) !important;
+  border-left-color: #ffa500 !important;
 }
 
 .remote-cursor[data-user-color="pink"] {
-  background-color: rgba(236, 72, 153, 0.3) !important;
-  border-left-color: rgb(236, 72, 153) !important;
+  background-color: rgba(255, 0, 128, 0.3) !important;
+  border-left-color: #ff0080 !important;
 }
 
 /* Selection highlight for remote users */
 .remote-selection {
-  background-color: rgba(59, 130, 246, 0.15) !important;
-  border: 1px solid rgba(59, 130, 246, 0.3);
+  background-color: rgba(0, 255, 0, 0.15) !important;
+  border: 1px solid rgba(0, 255, 0, 0.3);
+}
+
+/* Input and Button Hacker Styles */
+input, textarea, select {
+  background-color: #0a0a0a !important;
+  border: 1px solid #00ff00 !important;
+  color: #00ff00 !important;
+  caret-color: #00ff00;
+}
+
+input::placeholder, textarea::placeholder {
+  color: #006600 !important;
+}
+
+input:focus, textarea:focus, select:focus {
+  outline: none !important;
+  box-shadow: 0 0 5px rgba(0, 255, 0, 0.3) !important;
+  border-color: #33ff33 !important;
+}
+
+/* Button Hacker Styles */
+button {
+  font-family: 'Fira Code', monospace;
+}
+
+/* Link Hacker Styles */
+a {
+  color: #00ff00;
+  text-decoration: none;
+}
+
+a:hover {
+  color: #33ff33;
 }

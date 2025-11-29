@@ -33,10 +33,10 @@ export const FavoriteButton: React.FC<FavoriteButtonProps> = ({ sessionId, isFav
     <button
       onClick={handleToggle}
       disabled={loading}
-      className={`p-2 rounded-lg transition-all duration-200 ${
+      className={`p-2 transition-all duration-200 font-mono ${
         isFavorite
-          ? 'text-yellow-400 hover:text-yellow-500 bg-yellow-500/10 hover:bg-yellow-500/20'
-          : 'text-gray-400 hover:text-yellow-400 hover:bg-gray-700/50'
+          ? 'text-amber-400 hover:text-amber-300 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/50 hover:shadow-[0_0_10px_rgba(251,191,36,0.3)]'
+          : 'text-amber-600 hover:text-amber-400 border border-amber-500/30 hover:border-amber-500/50 bg-black'
       } disabled:opacity-50 disabled:cursor-not-allowed`}
       title={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
     >
