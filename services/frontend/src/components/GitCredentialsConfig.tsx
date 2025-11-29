@@ -141,7 +141,7 @@ export const GitCredentialsConfig: React.FC<GitCredentialsConfigProps> = ({
                 type={showToken ? "text" : "password"}
                 value={token}
                 onChange={(e) => setToken(e.target.value)}
-                placeholder="ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                placeholder="Enter your GitHub personal access token"
                 className="w-full px-3 py-2 bg-black border border-orange-500/50 text-orange-400 placeholder-orange-700 focus:outline-none focus:ring-1 focus:ring-orange-500 focus:border-orange-400 pr-10"
               />
               <button
