@@ -3,7 +3,7 @@ uvicorn[standard]==0.27.0
 pydantic==2.5.3
 transformers==4.51.0
 torch==2.7.0
-tokenizers==0.21.0
+tokenizers==0.22.1
 redis==5.0.1
 motor==3.3.2
 python-dotenv==1.0.0
